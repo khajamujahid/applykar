@@ -24,7 +24,7 @@ process.env.SR_DETAILS ??= "0";
 
 const MAX_MINUTES = Number(process.env.INGEST_MAX_MINUTES || 40);
 const CONCURRENCY = Number(process.env.INGEST_CONCURRENCY || 24);
-const DESC_CHARS = Number(process.env.INGEST_DESC_CHARS || 1200);
+const DESC_CHARS = Number(process.env.INGEST_DESC_CHARS || 500);
 const STORAGE_BUDGET_MB = Number(process.env.INGEST_STORAGE_BUDGET_MB || 820);
 const STALE_PRUNE_DAYS = Number(process.env.INGEST_STALE_PRUNE_DAYS || 3);
 const started = Date.now();
@@ -117,7 +117,7 @@ async function upsert(company: Company, normalized: NormalizedJob[]): Promise<{ 
       apply_url: job.applyUrl,
       source_url: job.sourceUrl === job.applyUrl ? null : job.sourceUrl,
       posted_at: job.postedAt?.toISOString() ?? null,
-      content_hash: sha256(`${job.title}|${job.locationRaw ?? ""}|${job.applyUrl}`).slice(0, 16),
+      content_hash: sha256(`${job.title}|${job.locationRaw ?? ""}|${job.applyUrl}|${description.slice(0, DESC_CHARS)}|${enriched.salary.min ?? ""}`).slice(0, 16),
       dedupe_key: dedupeKey({ companyName: job.companyName || company.name, title: job.title, locationRaw: job.locationRaw, workplace: enriched.workplace }),
     });
   }
@@ -138,6 +138,7 @@ async function upsert(company: Company, normalized: NormalizedJob[]): Promise<{ 
           salary_min = excluded.salary_min, salary_max = excluded.salary_max, skill_tags = excluded.skill_tags,
           apply_url = excluded.apply_url, posted_at = COALESCE(jobs.posted_at, excluded.posted_at),
           content_hash = excluded.content_hash, dedupe_key = excluded.dedupe_key, last_seen_at = now(), stale_at = NULL
+       WHERE jobs.content_hash IS DISTINCT FROM excluded.content_hash OR jobs.stale_at IS NOT NULL
        RETURNING (xmax = 0) AS inserted`,
       [JSON.stringify(rows.slice(i, i + 500))],
     );
@@ -218,7 +219,15 @@ async function main() {
   console.log(`seeded ${seeded} new boards`);
   const stats = { ok: 0, failed: 0, added: 0, us: 0 };
   const budgetMs = MAX_MINUTES * 60_000;
+  let checks = 0;
   while (Date.now() - started < budgetMs) {
+    if (++checks % 5 === 0) {
+      const size = await pool.query<{ mb: string }>("SELECT pg_database_size(current_database()) / 1048576 AS mb");
+      if (Number(size.rows[0].mb) > STORAGE_BUDGET_MB) {
+        console.log(`storage ${size.rows[0].mb}MB reached budget; stopping early`);
+        break;
+      }
+    }
     const batch = await claim(CONCURRENCY * 4);
     if (batch.length === 0) break;
     let index = 0;
@@ -233,6 +242,8 @@ async function main() {
     console.log(`progress ok=${stats.ok} failed=${stats.failed} usJobs=${stats.us} new=${stats.added} t=${Math.round((Date.now() - started) / 1000)}s`);
   }
   const mb = await maintain();
+  await pool.query("VACUUM (ANALYZE) jobs").catch(() => undefined);
+  await pool.query("VACUUM (ANALYZE) companies").catch(() => undefined);
   const { rows } = await pool.query(
     `SELECT (SELECT count(*) FROM companies) AS boards, (SELECT count(*) FROM companies WHERE enabled) AS live_boards,
             (SELECT count(*) FROM companies WHERE us_jobs > 0) AS hiring_us,
