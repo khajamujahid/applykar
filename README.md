@@ -103,3 +103,21 @@ Set the env vars above in the Vercel project. Ingestion cron hits `/api/cron/ing
 pnpm test
 pnpm test:e2e
 ```
+
+## Operations (live)
+
+- **Site:** https://applykar-khajamujahids-projects.vercel.app (Vercel project `applykar`, team `khajamujahids-projects`).
+- **Source of truth:** `github.com/khajamujahid/applykar` (`main`). Redeploy production after a push with the Vercel MCP
+  `create_deployment` using `gitSource: { type: "github", org: "khajamujahid", repo: "applykar", ref: "main" }`, `target: "production"`.
+  (The Vercel project is not Git-linked, so pushes do not auto-deploy; connect the repo under Project → Settings → Git to enable that.)
+- **Background jobs:** `github.com/khajamujahid/applykar-worker` Actions:
+  - `ingest.yml` hourly at :05 — `pnpm ingest:mass`: re-polls every US-hiring board older than 50 min first (freshness), then the long tail
+    of `data/boards.tsv.gz` (~73k public ATS boards: Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Workday, iCIMS, Recruitee,
+    BambooHR, Breezy, Rippling, JazzHR). US jobs only, 500-char snippets, closed jobs marked stale and pruned after 3 days, dedupe, vacuum,
+    storage guard (760 MB on Neon's 1 GB free branch: compacts, then refreshes hiring boards only).
+  - `apply-worker.yml` at :12 and :24 (inside the ingest window so Neon is already awake) — processes the Apply-20 queue with Playwright.
+    Never guesses: required questions without a saved answer are flagged, not submitted.
+  - `smoke.yml` — signed-in smoke test against a Neon test branch (needs a `SMOKE_DATABASE_URL` secret).
+- **Mail:** Settings → Connect Gmail (read-only). While a form waits for a code/link the worker calls `POST /api/worker/inbox-sync`
+  (Bearer `WORKER_SECRET`) to pull fresh mail, then reads the code/link from the inbox table.
+- **MCP:** `POST /api/mcp` with `Authorization: Bearer <MCP_BEARER_TOKEN>` (token shown in Settings to the signed-in owner).
