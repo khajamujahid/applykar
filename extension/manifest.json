@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Applykar",
+  "version": "0.1.0",
+  "description": "Save the posting you are viewing to Applykar and queue it on your own apply worker.",
+  "action": {
+    "default_title": "Applykar",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["storage"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["page-logic.js", "content.js"],
+      "css": ["button.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
