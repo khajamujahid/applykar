@@ -25,7 +25,7 @@ process.env.SR_DETAILS ??= "0";
 const MAX_MINUTES = Number(process.env.INGEST_MAX_MINUTES || 40);
 const CONCURRENCY = Number(process.env.INGEST_CONCURRENCY || 24);
 const DESC_CHARS = Number(process.env.INGEST_DESC_CHARS || 300);
-const STORAGE_BUDGET_MB = Number(process.env.INGEST_STORAGE_BUDGET_MB || 820);
+const STORAGE_BUDGET_MB = Number(process.env.INGEST_STORAGE_BUDGET_MB || 760);
 const STALE_PRUNE_DAYS = Number(process.env.INGEST_STALE_PRUNE_DAYS || 3);
 const started = Date.now();
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 6 });
@@ -220,7 +220,7 @@ async function maintain(force = false) {
   const mb = Number(rows[0].mb);
   if (force || mb > STORAGE_BUDGET_MB) {
     console.log(`storage ${mb}MB over budget, compacting`);
-    await pool.query(`UPDATE jobs SET description_text = left(description_text, 200) WHERE length(description_text) > 200`);
+    // Deletes only: an UPDATE would write new row versions and grow the database before vacuum.
     await pool.query(`DELETE FROM jobs j WHERE (stale_at IS NOT NULL OR posted_at < now() - interval '60 days')
       AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.job_id = j.id)
       AND NOT EXISTS (SELECT 1 FROM job_states s WHERE s.job_id = j.id)
