@@ -24,7 +24,7 @@ process.env.SR_DETAILS ??= "0";
 
 const MAX_MINUTES = Number(process.env.INGEST_MAX_MINUTES || 40);
 const CONCURRENCY = Number(process.env.INGEST_CONCURRENCY || 24);
-const DESC_CHARS = Number(process.env.INGEST_DESC_CHARS || 300);
+const DESC_CHARS = Number(process.env.INGEST_DESC_CHARS || 500);
 const STORAGE_BUDGET_MB = Number(process.env.INGEST_STORAGE_BUDGET_MB || 760);
 const STALE_PRUNE_DAYS = Number(process.env.INGEST_STALE_PRUNE_DAYS || 3);
 const started = Date.now();
