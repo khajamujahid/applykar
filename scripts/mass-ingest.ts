@@ -24,7 +24,7 @@ process.env.SR_DETAILS ??= "0";
 
 const MAX_MINUTES = Number(process.env.INGEST_MAX_MINUTES || 40);
 const CONCURRENCY = Number(process.env.INGEST_CONCURRENCY || 24);
-const DESC_CHARS = Number(process.env.INGEST_DESC_CHARS || 500);
+const DESC_CHARS = Number(process.env.INGEST_DESC_CHARS || 300);
 const STORAGE_BUDGET_MB = Number(process.env.INGEST_STORAGE_BUDGET_MB || 820);
 const STALE_PRUNE_DAYS = Number(process.env.INGEST_STALE_PRUNE_DAYS || 3);
 const started = Date.now();
@@ -162,7 +162,7 @@ const HOT_MINUTES = Number(process.env.INGEST_HOT_MINUTES || 50);
  * Freshness first: boards that are hiring in the US (us_jobs > 0) are re-polled every run once they are
  * older than HOT_MINUTES, newest-stale first. Only then does the run spend time on the long tail.
  */
-async function claim(limit: number): Promise<Company[]> {
+async function claim(limit: number, coldAllowed = true): Promise<Company[]> {
   const hot = await pool.query<Company>(
     `UPDATE companies SET last_synced_at = now()
      WHERE id IN (
@@ -174,7 +174,7 @@ async function claim(limit: number): Promise<Company[]> {
      RETURNING id, name, slug, source, (open_jobs IS NULL) AS first_sync`,
     [limit, BOARD_SOURCES, String(HOT_MINUTES)],
   );
-  if (hot.rows.length) return hot.rows;
+  if (hot.rows.length || !coldAllowed) return hot.rows;
   const { rows } = await pool.query<Company>(
     `UPDATE companies SET last_synced_at = now()
      WHERE id IN (
@@ -206,7 +206,7 @@ async function processCompany(company: Company, stats: Record<string, number>) {
   }
 }
 
-async function maintain() {
+async function maintain(force = false) {
   await pool.query(`DELETE FROM jobs j WHERE stale_at < now() - ($1 || ' days')::interval
     AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.job_id = j.id)
     AND NOT EXISTS (SELECT 1 FROM job_states s WHERE s.job_id = j.id)
@@ -218,13 +218,14 @@ async function maintain() {
     FROM ranked r WHERE r.id = j.id AND j.duplicate_of IS DISTINCT FROM NULLIF(r.keep, j.id)`);
   const { rows } = await pool.query<{ mb: string }>("SELECT pg_database_size(current_database()) / 1048576 AS mb");
   const mb = Number(rows[0].mb);
-  if (mb > STORAGE_BUDGET_MB) {
+  if (force || mb > STORAGE_BUDGET_MB) {
     console.log(`storage ${mb}MB over budget, compacting`);
-    await pool.query(`UPDATE jobs SET description_text = left(description_text, 400) WHERE length(description_text) > 400`);
-    await pool.query(`DELETE FROM jobs j WHERE (stale_at IS NOT NULL OR posted_at < now() - interval '45 days')
+    await pool.query(`UPDATE jobs SET description_text = left(description_text, 200) WHERE length(description_text) > 200`);
+    await pool.query(`DELETE FROM jobs j WHERE (stale_at IS NOT NULL OR posted_at < now() - interval '60 days')
       AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.job_id = j.id)
       AND NOT EXISTS (SELECT 1 FROM job_states s WHERE s.job_id = j.id)
       AND NOT EXISTS (SELECT 1 FROM bulk_items b WHERE b.job_id = j.id)`);
+    await pool.query("VACUUM jobs").catch(() => undefined);
   }
   return mb;
 }
@@ -239,15 +240,23 @@ async function main() {
   const stats = { ok: 0, failed: 0, added: 0, us: 0 };
   const budgetMs = MAX_MINUTES * 60_000;
   let checks = 0;
+  let coldAllowed = true;
+  let compacted = false;
   while (Date.now() - started < budgetMs) {
-    if (++checks % 5 === 0) {
+    if (++checks % 5 === 1) {
       const size = await pool.query<{ mb: string }>("SELECT pg_database_size(current_database()) / 1048576 AS mb");
       if (Number(size.rows[0].mb) > STORAGE_BUDGET_MB) {
-        console.log(`storage ${size.rows[0].mb}MB reached budget; stopping early`);
-        break;
+        if (!compacted) {
+          console.log(`storage ${size.rows[0].mb}MB over budget; compacting`);
+          await maintain(true);
+          compacted = true;
+        } else if (coldAllowed) {
+          console.log("still over budget; refreshing hiring boards only (no new boards this run)");
+          coldAllowed = false;
+        }
       }
     }
-    const batch = await claim(CONCURRENCY * 4);
+    const batch = await claim(CONCURRENCY * 4, coldAllowed);
     if (batch.length === 0) break;
     let index = 0;
     await Promise.all(

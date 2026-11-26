@@ -253,7 +253,7 @@ export const workdayAdapter: BoardAdapter = {
     const { host, tenant, site } = workdayParts(company.slug);
     const url = `https://${host}/wday/cxs/${tenant}/${site}/jobs`;
     const all: NormalizedJob[] = [];
-    const maxPages = Number(process.env.WORKDAY_MAX_PAGES || 15);
+    const maxPages = Number(process.env.WORKDAY_MAX_PAGES || 5);
     for (let page = 0; page < maxPages; page += 1) {
       const payload = await postJson(url, { limit: 20, offset: page * 20, appliedFacets: {}, searchText: "" });
       const parsed = parseWorkday(payload, company.slug, company.name);
