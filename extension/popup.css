@@ -1,0 +1,13 @@
+:root { color-scheme: dark; }
+body { margin: 0; width: 280px; background: #12141c; color: #f4f4f5; font: 13px/1.4 "Segoe UI", sans-serif; }
+header { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.mark { width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; background: #7c6af7; font-size: 11px; }
+section { display: grid; gap: 8px; padding: 12px; }
+label { display: grid; gap: 4px; color: #a1a1aa; font-size: 11px; }
+input, select, button { font: inherit; border-radius: 8px; border: 1px solid rgba(255,255,255,.12); background: #1b1e29; color: inherit; padding: 6px 8px; }
+button { background: #7c6af7; border-color: transparent; cursor: pointer; }
+#forget { background: transparent; color: #a1a1aa; }
+ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+li { color: #d4d4d8; }
+.hint, .error { margin: 0; }
+.error { color: #f0a3a8; }
