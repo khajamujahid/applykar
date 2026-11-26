@@ -52,7 +52,7 @@ Boards live in `data/companies.json` as `{ "name", "slug", "source" }`. `source`
 
 ## Apply worker
 
-Vercel cannot run the browser. GitHub Actions runs `pnpm apply:worker -- --once` every 10 minutes (`.github/workflows/apply-worker.yml`) on the free public-runner minutes. The workflow needs a repository secret named `DATABASE_URL` (the Neon pooled URL). `APPLY_SUBMIT=1` submits. Set it to `0` to fill forms and stop.
+Vercel cannot run the browser. GitHub Actions runs `pnpm apply:worker -- --once` every 10 minutes (`.github/workflows/apply-worker.yml`) on the free public-runner minutes. The workflow needs a repository secret named `DATABASE_URL` (the same Neon pooled URL as the Vercel project). Until that secret exists, the scheduled run logs the gap and does not submit. `APPLY_SUBMIT=1` submits. Set it to `0` to fill forms and stop.
 
 You can also run it on any machine with Playwright:
 

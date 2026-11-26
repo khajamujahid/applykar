@@ -28,12 +28,18 @@ jobs:
           key: playwright-chromium-1.65.1
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm apply:worker -- --once
+      - name: Apply queued jobs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ALLOWED_EMAILS: khajamujahiddin@gmail.com
           APPLY_SUBMIT: "1"
           APPLY_CONCURRENCY: "2"
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL is not set. Add the Neon pooled URL as an Actions secret named DATABASE_URL. This run will not submit until that secret exists."
+            exit 0
+          fi
+          pnpm apply:worker -- --once
       - uses: actions/upload-artifact@v4
         if: always()
         with:
