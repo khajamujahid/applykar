@@ -7,9 +7,15 @@ import { searchJobs } from "@/lib/services/jobs";
 
 export async function createBulkRun(profileId: string, count: number) {
   const size = Math.min(50, Math.max(5, count));
-  const feed = await searchJobs(profileId, {});
-  const picked = feed.jobs.filter((job) => sourceFromUrl(job.applyUrl)).slice(0, size);
   const db = getDb();
+  const feed = await searchJobs(profileId, { sources: ["greenhouse", "lever", "ashby", "workday", "icims"] });
+  const already = await db
+    .select({ jobId: bulkItems.jobId })
+    .from(bulkItems)
+    .innerJoin(bulkRuns, eq(bulkRuns.id, bulkItems.runId))
+    .where(eq(bulkRuns.profileId, profileId));
+  const seen = new Set(already.map((row) => row.jobId));
+  const picked = feed.jobs.filter((job) => sourceFromUrl(job.applyUrl) && !seen.has(job.id)).slice(0, size);
   const runs = await db.insert(bulkRuns).values({ profileId, requested: size, status: "queued" }).returning();
   const run = runs[0];
   if (!run) throw new Error("Could not start the apply run");
