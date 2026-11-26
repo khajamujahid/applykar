@@ -4,6 +4,11 @@ export const JOB_SOURCES = [
   "ashby",
   "smartrecruiters",
   "workable",
+  "workday",
+  "icims",
+  "recruitee",
+  "bamboohr",
+  "breezy",
   "adzuna",
   "usajobs",
   "jsearch",
@@ -15,6 +20,11 @@ export const BOARD_SOURCES = [
   "ashby",
   "smartrecruiters",
   "workable",
+  "workday",
+  "icims",
+  "recruitee",
+  "bamboohr",
+  "breezy",
 ] as const;
 
 export const SENIORITIES = [

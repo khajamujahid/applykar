@@ -13,7 +13,7 @@ function showError(message) {
 
 async function load() {
   const stored = await chrome.storage.local.get(["baseUrl", "token"]);
-  baseUrl.value = stored.baseUrl || "http://127.0.0.1:4317";
+  baseUrl.value = stored.baseUrl || "https://applykar-khajamujahids-projects.vercel.app";
   if (!stored.token) return;
   token.value = stored.token;
   const response = await fetch(stored.baseUrl.replace(/\/$/, "") + "/api/extension/me", {

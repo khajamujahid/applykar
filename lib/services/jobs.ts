@@ -144,6 +144,7 @@ export async function searchJobs(profileId: string, filters: JobFilters = {}): P
     if (search) where.push(search);
   }
   if (filters.sources?.length) where.push(inArray(jobs.source, filters.sources));
+  if (!filters.includeNonUs) where.push(sql`${jobs.usScope} <> 'non_us'`);
   if (filters.workplace?.length) where.push(inArray(jobs.workplace, filters.workplace));
   if (filters.postedWithinDays) {
     const since = new Date(Date.now() - filters.postedWithinDays * 86_400_000);
@@ -164,8 +165,8 @@ export async function searchJobs(profileId: string, filters: JobFilters = {}): P
     .leftJoin(jobStates, and(eq(jobStates.jobId, jobs.id), eq(jobStates.profileId, profileId)))
     .leftJoin(applications, and(eq(applications.jobId, jobs.id), eq(applications.profileId, profileId)))
     .where(and(...where))
-    .orderBy(desc(jobs.postedAt))
-    .limit(500);
+    .orderBy(sql`${jobs.postedAt} DESC NULLS LAST`)
+    .limit(600);
   const scored = rows
     .map((row) => toScored(row as JobRow, profile, false))
     .filter((job) => (tab === "applied" ? true : passesHardFilters(job, profile, filters) && matchesListing(job, filters)))

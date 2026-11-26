@@ -1,0 +1,14 @@
+ALTER TYPE job_source ADD VALUE IF NOT EXISTS 'workday';
+ALTER TYPE job_source ADD VALUE IF NOT EXISTS 'icims';
+ALTER TYPE job_source ADD VALUE IF NOT EXISTS 'recruitee';
+ALTER TYPE job_source ADD VALUE IF NOT EXISTS 'bamboohr';
+ALTER TYPE job_source ADD VALUE IF NOT EXISTS 'breezy';
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS jobs_active_posted_idx ON jobs (posted_at DESC NULLS LAST) WHERE stale_at IS NULL AND duplicate_of IS NULL;
+CREATE INDEX IF NOT EXISTS jobs_title_trgm_idx ON jobs USING gin (title gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS jobs_company_name_trgm_idx ON jobs USING gin (company_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS jobs_stale_idx ON jobs (stale_at) WHERE stale_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS companies_sync_idx ON companies (enabled, last_synced_at NULLS FIRST);
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS open_jobs integer;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS us_jobs integer;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS fail_count integer NOT NULL DEFAULT 0;

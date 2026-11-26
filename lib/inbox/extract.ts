@@ -34,9 +34,14 @@ export function detectAts(from: string, text: string): AtsName {
   return "unknown";
 }
 
+// Greenhouse: "Copy and paste this code into the security code field on your application: AbC12xYz"
+const ALNUM_CODE = /(?:security code field[^:\n]*|verification code|security code|your code)\s*(?:is|:)\s*([A-Za-z0-9]{6,10})\b/i;
+
 export function extractCode(text: string): string | null {
   const match = CODE.exec(text);
-  return match?.[1] ?? null;
+  if (match?.[1]) return match[1];
+  const alnum = ALNUM_CODE.exec(text);
+  return alnum?.[1] && /\d/.test(alnum[1]) ? alnum[1] : alnum?.[1] && /^[A-Za-z0-9]{8}$/.test(alnum[1]) ? alnum[1] : null;
 }
 
 export function extractVerifyUrl(text: string): string | null {

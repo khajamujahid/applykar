@@ -10,6 +10,8 @@ const targets = [
   ["greenhouse", "https://job-boards.greenhouse.io/airtable/jobs/7909563002"],
   ["lever", "https://jobs.lever.co/100ms/4c9f19c7-4432-4394-ba93-167319c68adc/apply"],
   ["ashby", "https://jobs.ashbyhq.com/notion/11e56782-ee28-4025-ba0e-76222b0bfcea/application"],
+  ["workday", process.env.DRY_RUN_WORKDAY || "https://2020companies.wd1.myworkdayjobs.com/external_careers/job/Bronx-NY/Google-TV-Experience-Manager_REQ_116514"],
+  ["icims", process.env.DRY_RUN_ICIMS || "https://careers-360care.icims.com/jobs/5699/mobile-medical-assistant/job"],
 ] as const;
 
 async function main() {
@@ -17,7 +19,8 @@ async function main() {
   const outDir = process.env.DRY_RUN_OUT || path.join(process.cwd(), "data", "proofs");
   await mkdir(outDir, { recursive: true });
   const summary = [];
-  for (const [expected, url] of targets) {
+  const only = process.env.DRY_RUN_ONLY?.split(",");
+  for (const [expected, url] of targets.filter(([name]) => !only || only.includes(name))) {
     const source = sourceFromUrl(url);
     if (source !== expected) throw new Error(`Expected ${expected} for ${url}`);
     const page = await browser.newPage();

@@ -1,6 +1,6 @@
-import { and, desc, eq, ilike, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, isNotNull, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { inboxMessages, profiles } from "@/lib/db/schema";
+import { inboxMessages, ownerSettings, profiles } from "@/lib/db/schema";
 import { extractApplicationMail, type InboundEmail } from "@/lib/inbox/extract";
 import { listApplications, updateApplicationStatus } from "@/lib/services/applications";
 
@@ -22,13 +22,14 @@ export type StoredMail = {
 
 export async function ingestInboundEmail(message: InboundEmail): Promise<StoredMail> {
   const db = getDb();
-  const recipient = message.to.toLowerCase();
+  const recipient = (/<([^>]+)>/.exec(message.to)?.[1] ?? message.to).trim().toLowerCase();
   const profileRows = await db
     .select()
     .from(profiles)
     .where(sql`lower(${profiles.applicationEmail}) = ${recipient}`)
     .limit(1);
-  const profile = profileRows[0];
+  // Single-owner app: mail that reaches the owner's own inbox (Gmail/IMAP) belongs to the active profile.
+  const profile = profileRows[0] ?? (await fallbackProfile());
   const extracted = extractApplicationMail(message);
   const receivedAt = message.receivedAt ?? new Date();
   const messageId = message.messageId?.trim() || null;
@@ -71,6 +72,18 @@ export async function ingestInboundEmail(message: InboundEmail): Promise<StoredM
   return toStored(row, false);
 }
 
+async function fallbackProfile() {
+  const db = getDb();
+  const settings = await db.select().from(ownerSettings).where(eq(ownerSettings.id, "owner")).limit(1);
+  const activeId = settings[0]?.activeProfileId;
+  if (activeId) {
+    const active = await db.select().from(profiles).where(eq(profiles.id, activeId)).limit(1);
+    if (active[0]) return active[0];
+  }
+  const first = await db.select().from(profiles).orderBy(asc(profiles.createdAt)).limit(1);
+  return first[0];
+}
+
 async function matchApplication(
   profileId: string,
   employer: string | null,
@@ -102,8 +115,8 @@ export async function listInbox(profileId: string) {
   return rows.map((row) => toStored(row, false));
 }
 
-export async function getLatestCode(profileId: string, employer: string) {
-  const row = await findForEmployer(profileId, employer, true);
+export async function getLatestCode(profileId: string, employer: string, since?: Date) {
+  const row = await findForEmployer(profileId, employer, true, since);
   if (!row?.verificationCode) return null;
   return {
     code: row.verificationCode,
@@ -115,8 +128,8 @@ export async function getLatestCode(profileId: string, employer: string) {
   };
 }
 
-export async function getVerifyLink(profileId: string, employer: string) {
-  const row = await findForEmployer(profileId, employer, false);
+export async function getVerifyLink(profileId: string, employer: string, since?: Date) {
+  const row = await findForEmployer(profileId, employer, false, since);
   if (!row?.verifyUrl) return null;
   return {
     url: row.verifyUrl,
@@ -128,7 +141,7 @@ export async function getVerifyLink(profileId: string, employer: string) {
   };
 }
 
-async function findForEmployer(profileId: string, employer: string, codeOnly: boolean) {
+async function findForEmployer(profileId: string, employer: string, codeOnly: boolean, since?: Date) {
   const needle = `%${employer.trim()}%`;
   const rows = await getDb()
     .select()
@@ -136,6 +149,7 @@ async function findForEmployer(profileId: string, employer: string, codeOnly: bo
     .where(
       and(
         eq(inboxMessages.profileId, profileId),
+        since ? gte(inboxMessages.receivedAt, since) : undefined,
         codeOnly ? isNotNull(inboxMessages.verificationCode) : isNotNull(inboxMessages.verifyUrl),
         or(ilike(inboxMessages.employer, needle), ilike(inboxMessages.subject, needle), ilike(inboxMessages.textBody, needle), ilike(inboxMessages.sender, needle)),
       ),

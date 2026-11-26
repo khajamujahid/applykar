@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Applykar",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Save the posting you are viewing to Applykar and queue it on your own apply worker.",
   "action": {
     "default_title": "Applykar",

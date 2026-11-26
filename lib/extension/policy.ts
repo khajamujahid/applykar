@@ -9,7 +9,7 @@ export function isHandsOffHost(url: string): boolean {
   }
 }
 
-/** The worker only submits Greenhouse, Lever, and Ashby. Other sites stay on the page for autofill. */
+/** The worker submits Greenhouse, Lever, Ashby, Workday, and iCIMS. Other sites stay on the page for autofill. */
 export function serverApplySource(url: string): ApplySource | null {
   if (isHandsOffHost(url)) return null;
   return sourceFromUrl(url);

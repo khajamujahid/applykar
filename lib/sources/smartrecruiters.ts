@@ -100,7 +100,7 @@ export const smartrecruitersAdapter: BoardAdapter = {
       if (content.length === 0 || offset >= total) break;
     }
     const details: Record<string, unknown> = {};
-    const newest = listings.slice(0, 25);
+    const newest = process.env.SR_DETAILS === "0" ? [] : listings.slice(0, 25);
     await mapPool(newest, 4, async (job) => {
       const id = asString(job.id);
       if (!id) return;

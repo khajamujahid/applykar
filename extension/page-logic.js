@@ -15,6 +15,8 @@
       if (host.includes("greenhouse.io")) return "greenhouse";
       if (host.includes("lever.co")) return "lever";
       if (host.includes("ashbyhq.com")) return "ashby";
+      if (host.endsWith(".myworkdayjobs.com")) return "workday";
+      if (host.endsWith(".icims.com")) return "icims";
       return null;
     } catch (error) {
       return null;

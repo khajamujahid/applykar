@@ -19,7 +19,7 @@ type BulkRun = {
 
 const workplaces: Workplace[] = ["remote", "hybrid", "onsite"];
 const seniorities: Seniority[] = ["junior", "mid", "senior", "staff", "principal"];
-const sources: JobSource[] = ["greenhouse", "lever", "ashby", "smartrecruiters", "workable"];
+const sources: JobSource[] = ["greenhouse", "lever", "ashby", "smartrecruiters", "workable", "workday", "icims", "recruitee", "bamboohr", "breezy"];
 
 export function FeedView({
   jobs,

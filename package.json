@@ -13,6 +13,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "ingest": "tsx scripts/ingest.ts",
+    "ingest:mass": "tsx scripts/mass-ingest.ts",
     "apply:worker": "tsx scripts/apply-worker.ts",
     "extension:zip": "tsx scripts/pack-extension.ts"
   },

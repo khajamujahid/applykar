@@ -20,6 +20,8 @@ export type PlannedAnswer = {
   kind: "text" | "choice";
 };
 
+export { savedValue };
+
 export type ApplyPlan = {
   ready: boolean;
   answers: PlannedAnswer[];
@@ -39,6 +41,11 @@ const RULES: { patterns: RegExp; key: string }[] = [
   { key: "eeo_race", patterns: /race|ethnicity/i },
   { key: "eeo_veteran", patterns: /veteran/i },
   { key: "eeo_disability", patterns: /disability/i },
+  { key: "address_line1", patterns: /address line 1|street address|^address$/i },
+  { key: "postal_code", patterns: /postal code|zip/i },
+  { key: "state_region", patterns: /^state$|state\/province|^province$|^region$/i },
+  { key: "previous_worker", patterns: /previously (?:been )?(?:employed|worked)|former employee|current or former|worked (?:for|at) .* before/i },
+  { key: "referral_source", patterns: /how did you hear|^source$|referral source/i },
 ];
 
 function savedValue(answers: AnswerRecord[], key: string): string | null {

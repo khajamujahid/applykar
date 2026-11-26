@@ -40,7 +40,13 @@ export const jobSource = pgEnum("job_source", [
   "usajobs",
   "jsearch",
   "captured",
+  "workday",
+  "icims",
+  "recruitee",
+  "bamboohr",
+  "breezy",
 ]);
+
 
 export const workplace = pgEnum("workplace", ["remote", "hybrid", "onsite", "unknown"]);
 export const seniority = pgEnum("seniority", [

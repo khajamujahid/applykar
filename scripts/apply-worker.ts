@@ -3,7 +3,7 @@ import { chromium } from "playwright";
 import { applyOnPage } from "../lib/apply/browser";
 import type { ApplySource } from "../lib/apply/hosts";
 import { claimQueuedItems, finishBulkItem } from "../lib/apply/bulk";
-import { getLatestCode, getVerifyLink } from "../lib/inbox/store";
+import { mailWaiter } from "../lib/apply/mail-wait";
 import { getAnswers, getProfile } from "../lib/services/profiles";
 import { updateApplicationStatus, queueApplication } from "../lib/services/applications";
 import { getDb } from "../lib/db/client";
@@ -56,10 +56,7 @@ async function runOne(item: {
       resumeFilename: profile.resumeFilename,
       applicant: { name: OWNER_NAME, email },
       submit,
-      verification: {
-        getCode: async (employer) => (await getLatestCode(profileId, employer))?.code ?? null,
-        getLink: async (employer) => (await getVerifyLink(profileId, employer))?.url ?? null,
-      },
+      verification: mailWaiter(profileId, new Date()),
     });
     if (result.status === "applied") {
       const application = await queueApplication(profileId, item.jobId, "ready_for_review");

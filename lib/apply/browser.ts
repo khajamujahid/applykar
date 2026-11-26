@@ -19,6 +19,7 @@ export type ApplyRequest = {
   answers: AnswerRecord[];
   resumeText: string;
   resumeFilename?: string | null;
+  resumeFilePath?: string | null;
   submit: boolean;
   applicant?: Applicant;
   verification?: VerificationLookup;
@@ -49,6 +50,10 @@ function controlLocator(page: Page, id: string) {
 
 export async function applyOnPage(page: Page, request: ApplyRequest, options?: { skipNavigation?: boolean }): Promise<ApplyResult> {
   assertApplyHost(request.url);
+  if (request.source === "workday" || request.source === "icims") {
+    const flows = await import("@/lib/apply/ats-flows");
+    return request.source === "workday" ? flows.applyWorkday(page, request) : flows.applyIcims(page, request);
+  }
   if (!options?.skipNavigation) {
     await page.goto(request.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
     await page.locator("form label, form input").first().waitFor({ timeout: 12_000 }).catch(() => undefined);
@@ -130,20 +135,31 @@ export async function applyOnPage(page: Page, request: ApplyRequest, options?: {
   }
   await page.locator("button[type='submit'], input[type='submit'], button:has-text('Submit application')").first().click();
   await page.waitForTimeout(500);
+  await page.waitForTimeout(2500);
+  // Greenhouse emails an 8-character security code into split boxes (security-input-0..7).
+  const splitCode = page.locator("input[id^='security-input-']");
+  if ((await splitCode.count()) > 0 && request.verification) {
+    const code = await request.verification.getCode(request.employer);
+    if (!code) {
+      await shoot();
+      return { status: "failed", missing: [], proofNote: null, screenshotPath, error: "The form asked for an email security code that has not arrived." };
+    }
+    const boxes = await splitCode.count();
+    for (let index = 0; index < boxes && index < code.length; index += 1) await splitCode.nth(index).fill(code[index]);
+    await page.locator("button[type='submit'], input[type='submit'], button:has-text('Submit application')").first().click();
+    await page.waitForTimeout(3000);
+  }
   const codeField = page.locator("input[name='code'], #verification_code").first();
   if ((await codeField.count()) > 0 && request.verification) {
     let code: string | null = null;
-    for (let attempt = 0; attempt < 3 && !code; attempt += 1) {
-      code = await request.verification.getCode(request.employer);
-      if (!code) await page.waitForTimeout(200);
-    }
+    code = await request.verification.getCode(request.employer);
     if (!code) {
       await shoot();
       return { status: "failed", missing: [], proofNote: null, screenshotPath, error: "The form asked for a verification code that is not in the inbox." };
     }
     await codeField.fill(code);
     await page.locator("button[type='submit'], input[type='submit']").first().click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(3000);
   }
   const after = await page.locator("body").innerText();
   await shoot();

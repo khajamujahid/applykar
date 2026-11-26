@@ -6,6 +6,7 @@ import { optionalAdapters } from "@/lib/sources/optional";
 import { smartrecruitersAdapter } from "@/lib/sources/smartrecruiters";
 import type { BoardAdapter, OptionalAdapter } from "@/lib/sources/types";
 import { workableAdapter } from "@/lib/sources/workable";
+import { bamboohrAdapter, breezyAdapter, icimsAdapter, recruiteeAdapter, workdayAdapter } from "@/lib/sources/more";
 
 export const boardAdapters: Record<BoardSource, BoardAdapter> = {
   greenhouse: greenhouseAdapter,
@@ -13,6 +14,11 @@ export const boardAdapters: Record<BoardSource, BoardAdapter> = {
   ashby: ashbyAdapter,
   smartrecruiters: smartrecruitersAdapter,
   workable: workableAdapter,
+  workday: workdayAdapter,
+  icims: icimsAdapter,
+  recruitee: recruiteeAdapter,
+  bamboohr: bamboohrAdapter,
+  breezy: breezyAdapter,
 };
 
 export function getBoardAdapter(source: BoardSource): BoardAdapter {

@@ -42,5 +42,21 @@ export function boardEndpoints(source: BoardSource, slug: string): { apiUrl: str
         apiUrl: `https://apply.workable.com/api/v1/widget/accounts/${encodeURIComponent(slug)}?details=true`,
         careersUrl: `https://apply.workable.com/${encodeURIComponent(slug)}`,
       };
+    case "workday": {
+      const [host, ...site] = slug.split("/");
+      const tenant = host.split(".")[0];
+      return {
+        apiUrl: `https://${host}.myworkdayjobs.com/wday/cxs/${tenant}/${site.join("/")}/jobs`,
+        careersUrl: `https://${host}.myworkdayjobs.com/${site.join("/")}`,
+      };
+    }
+    case "icims":
+      return { apiUrl: `https://careers-${slug}.icims.com/jobs/search?ss=1&in_iframe=1`, careersUrl: `https://careers-${slug}.icims.com/jobs` };
+    case "recruitee":
+      return { apiUrl: `https://${slug}.recruitee.com/api/offers/`, careersUrl: `https://${slug}.recruitee.com` };
+    case "bamboohr":
+      return { apiUrl: `https://${slug}.bamboohr.com/careers/list`, careersUrl: `https://${slug}.bamboohr.com/careers` };
+    case "breezy":
+      return { apiUrl: `https://${slug}.breezy.hr/json`, careersUrl: `https://${slug}.breezy.hr` };
   }
 }

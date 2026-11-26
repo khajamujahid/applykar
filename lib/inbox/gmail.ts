@@ -18,11 +18,28 @@ function plainText(part: GmailPart | undefined): string {
   return "";
 }
 
+function htmlText(part: GmailPart | undefined): string {
+  if (!part) return "";
+  if (part.mimeType === "text/html" && part.body?.data) {
+    // Keep hrefs so verify links survive the HTML-to-text step.
+    return decode(part.body.data)
+      .replace(/<a [^>]*href="([^"]+)"[^>]*>/gi, " $1 ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/\s+/g, " ");
+  }
+  for (const child of part.parts ?? []) {
+    const text = htmlText(child);
+    if (text) return text;
+  }
+  return "";
+}
+
 function header(part: GmailPart, name: string): string {
   return part.headers?.find((item) => item.name.toLowerCase() === name)?.value ?? "";
 }
 
-export async function syncGmail(): Promise<{ imported: number; skipped?: string }> {
+export async function syncGmail(options: { newerThan?: string; max?: number } = {}): Promise<{ imported: number; skipped?: string }> {
   const connection = await getGmailConnection();
   const refreshToken = connection?.refreshToken;
   const clientId = process.env.AUTH_GOOGLE_ID;
@@ -43,8 +60,10 @@ export async function syncGmail(): Promise<{ imported: number; skipped?: string 
   const token = (await tokenResponse.json()) as { access_token?: string };
   if (!token.access_token) return { imported: 0, skipped: "Gmail token refresh failed" };
 
-  const query = encodeURIComponent("newer_than:21d (verification OR application OR interview OR unfortunately)");
-  const listResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=${query}`, {
+  const query = encodeURIComponent(
+    `newer_than:${options.newerThan ?? "21d"} (verification OR verify OR code OR passcode OR confirm OR application OR interview OR unfortunately)`,
+  );
+  const listResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${options.max ?? 25}&q=${query}`, {
     headers: { authorization: `Bearer ${token.access_token}` },
   });
   if (!listResponse.ok) return { imported: 0, skipped: "Gmail list failed" };
@@ -55,7 +74,7 @@ export async function syncGmail(): Promise<{ imported: number; skipped?: string 
       headers: { authorization: `Bearer ${token.access_token}` },
     });
     if (!detailResponse.ok) continue;
-    const detail = (await detailResponse.json()) as { payload?: GmailPart };
+    const detail = (await detailResponse.json()) as { payload?: GmailPart; internalDate?: string };
     const payload = detail.payload;
     if (!payload) continue;
     const stored = await ingestInboundEmail({
@@ -63,7 +82,8 @@ export async function syncGmail(): Promise<{ imported: number; skipped?: string 
       to: header(payload, "to"),
       subject: header(payload, "subject"),
       messageId: header(payload, "message-id") || message.id,
-      text: plainText(payload),
+      text: plainText(payload) || htmlText(payload),
+      receivedAt: detail.internalDate ? new Date(Number(detail.internalDate)) : undefined,
     });
     if (!stored.duplicate) imported += 1;
   }
