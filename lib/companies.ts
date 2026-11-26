@@ -56,6 +56,10 @@ export function boardEndpoints(source: BoardSource, slug: string): { apiUrl: str
       return { apiUrl: `https://${slug}.recruitee.com/api/offers/`, careersUrl: `https://${slug}.recruitee.com` };
     case "bamboohr":
       return { apiUrl: `https://${slug}.bamboohr.com/careers/list`, careersUrl: `https://${slug}.bamboohr.com/careers` };
+    case "rippling":
+      return { apiUrl: `https://ats.rippling.com/api/v2/board/${slug}/jobs`, careersUrl: `https://ats.rippling.com/${slug}/jobs` };
+    case "jazzhr":
+      return { apiUrl: `https://${slug}.applytojob.com/apply`, careersUrl: `https://${slug}.applytojob.com/apply` };
     case "breezy":
       return { apiUrl: `https://${slug}.breezy.hr/json`, careersUrl: `https://${slug}.breezy.hr` };
   }

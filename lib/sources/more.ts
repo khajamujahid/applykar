@@ -278,3 +278,77 @@ export const icimsAdapter: BoardAdapter = {
     return all;
   },
 };
+
+export function parseRippling(payload: unknown, fallbackCompany: string): NormalizedJob[] {
+  return list(asRecord(payload)?.items).flatMap((entry) => {
+    const title = asString(entry.name);
+    const id = asString(entry.id);
+    const url = asString(entry.url);
+    if (!title || !id || !url) return [];
+    const location = list(entry.locations)[0];
+    const type = asString(location?.workplaceType) ?? "";
+    return [
+      job({
+        source: "rippling",
+        externalId: id,
+        title,
+        companyName: fallbackCompany,
+        descriptionText: "",
+        locationRaw: asString(location?.name),
+        city: asString(location?.city),
+        region: asString(location?.stateCode),
+        country: asString(location?.countryCode) ?? asString(location?.country),
+        workplaceHint: type === "REMOTE" ? "remote" : type === "HYBRID" ? "hybrid" : type === "ON_SITE" ? "onsite" : "unknown",
+        applyUrl: url,
+        postedAt: null,
+      }),
+    ];
+  });
+}
+
+export function parseJazz(html: string, fallbackCompany: string): NormalizedJob[] {
+  const results: NormalizedJob[] = [];
+  for (const block of html.split(/<li class="list-group-item">/).slice(1)) {
+    const link = /<a href="(https:\/\/[^"]+\.applytojob\.com\/apply\/([A-Za-z0-9]+)\/[^"]*)"[^>]*>([\s\S]*?)<\/a>/.exec(block);
+    if (!link) continue;
+    const loc = /fa-map-marker'><\/i>([^<]*)</.exec(block)?.[1]?.trim() || null;
+    results.push(
+      job({
+        source: "jazzhr",
+        externalId: link[2],
+        title: decodeHtml(link[3]).trim(),
+        companyName: fallbackCompany,
+        descriptionText: "",
+        locationRaw: loc ? decodeHtml(loc) : null,
+        city: null,
+        region: null,
+        country: null,
+        workplaceHint: /remote/i.test(loc ?? "") ? "remote" : "unknown",
+        applyUrl: link[1],
+        postedAt: null,
+      }),
+    );
+  }
+  return results;
+}
+
+export const ripplingAdapter: BoardAdapter = {
+  source: "rippling",
+  async fetchJobs(company, fetchImpl: FetchLike = fetch) {
+    const all: NormalizedJob[] = [];
+    for (let page = 0; page < 10; page += 1) {
+      const payload = await fetchJson(`https://ats.rippling.com/api/v2/board/${company.slug}/jobs?page=${page}`, fetchImpl);
+      all.push(...parseRippling(payload, company.name));
+      const pages = Number(asRecord(payload)?.totalPages ?? 0);
+      if (page + 1 >= pages) break;
+    }
+    return all;
+  },
+};
+
+export const jazzhrAdapter: BoardAdapter = {
+  source: "jazzhr",
+  async fetchJobs(company, fetchImpl: FetchLike = fetch) {
+    return parseJazz(await fetchText(`https://${company.slug}.applytojob.com/apply`, fetchImpl), company.name);
+  },
+};

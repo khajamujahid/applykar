@@ -45,6 +45,8 @@ export const jobSource = pgEnum("job_source", [
   "recruitee",
   "bamboohr",
   "breezy",
+  "rippling",
+  "jazzhr",
 ]);
 
 

@@ -9,6 +9,8 @@ export const JOB_SOURCES = [
   "recruitee",
   "bamboohr",
   "breezy",
+  "rippling",
+  "jazzhr",
   "adzuna",
   "usajobs",
   "jsearch",
@@ -25,6 +27,8 @@ export const BOARD_SOURCES = [
   "recruitee",
   "bamboohr",
   "breezy",
+  "rippling",
+  "jazzhr",
 ] as const;
 
 export const SENIORITIES = [
