@@ -1,0 +1,172 @@
+{
+  "list": {
+    "totalFound": 1,
+    "content": [
+      {
+        "id": "6000000001608848",
+        "name": "Strategic Account Executive, Japan",
+        "uuid": "eb872a6c-99e6-493a-b8af-3c65978855d3",
+        "jobAdId": "8c05730d-6cca-4a00-842c-187c90ea1c7d",
+        "defaultJobAd": true,
+        "refNumber": "R103172",
+        "company": {
+          "identifier": "Canva",
+          "name": "Canva"
+        },
+        "releasedDate": "2026-11-26T02:36:04.311Z",
+        "location": {
+          "city": "Tokyo",
+          "region": "Tokyo",
+          "country": "jp",
+          "remote": false,
+          "hybrid": true,
+          "latitude": "35.6803997",
+          "longitude": "139.7690174",
+          "fullLocation": "Tokyo, Tokyo, Japan"
+        },
+        "industry": {
+          "id": "computer_software",
+          "label": "Computer Software"
+        },
+        "department": {},
+        "function": {
+          "id": "sales",
+          "label": "Sales"
+        },
+        "typeOfEmployment": {
+          "id": "permanent",
+          "label": "Full-time"
+        },
+        "experienceLevel": {
+          "id": "not_applicable",
+          "label": "Not Applicable"
+        },
+        "customField": [
+          {
+            "fieldId": "651ba508aac0da4b9cbd91cb",
+            "fieldLabel": "Worker type",
+            "valueId": "d588c41a446c11de98360015c5e6daf6",
+            "valueLabel": "Employee"
+          },
+          {
+            "fieldId": "67db425d21ec03315da962cb",
+            "fieldLabel": "Org",
+            "valueId": "552b243cafd4100169ad594c750c0000",
+            "valueLabel": "Go To Market"
+          },
+          {
+            "fieldId": "651b8b8aaac0da4b9cbd91c9",
+            "fieldLabel": "Recruitment type",
+            "valueId": "2c2d396a-3d34-4286-8196-61a215221fd5",
+            "valueLabel": "Permanent"
+          },
+          {
+            "fieldId": "651ba0b93066d20abe11145b",
+            "fieldLabel": "Specialty",
+            "valueId": "220b5c7e743d01c7acafdaa7b8008513",
+            "valueLabel": "Sales & Success"
+          },
+          {
+            "fieldId": "651b8bc23066d20abe111459",
+            "fieldLabel": "Supergroup",
+            "valueId": "d7055559fd68100169cd0af372c80000",
+            "valueLabel": "Sales & Success"
+          },
+          {
+            "fieldId": "651ba1c7aac0da4b9cbd91ca",
+            "fieldLabel": "Role level",
+            "valueId": "S4",
+            "valueLabel": "S4"
+          },
+          {
+            "fieldId": "651b99e25ddc3c31d9224321",
+            "fieldLabel": "Group",
+            "valueId": "d72904e5618a1000e76b300305890000",
+            "valueLabel": "APJ Sales"
+          },
+          {
+            "fieldId": "651ba171eec5b66729429433",
+            "fieldLabel": "Subspecialty",
+            "valueId": "220b5c7e743d01c4f25814f4b7000713",
+            "valueLabel": "Account Management"
+          },
+          {
+            "fieldId": "COUNTRY",
+            "fieldLabel": "Country/Region",
+            "valueId": "jp",
+            "valueLabel": "Japan"
+          },
+          {
+            "fieldId": "6514d94a9c140e09b2e649f5",
+            "fieldLabel": "Brands",
+            "valueId": "default",
+            "valueLabel": "Canva"
+          },
+          {
+            "fieldId": "651b8a7b58759b40ab8abd45",
+            "fieldLabel": "Employment type",
+            "valueId": "01ca83be4eaa01d34208432ca5005301",
+            "valueLabel": "Permanent"
+          },
+          {
+            "fieldId": "651ba22058759b40ab8abd46",
+            "fieldLabel": "Time type",
+            "valueId": "2ca83e80de45013371c1658ff3029500",
+            "valueLabel": "Full time"
+          }
+        ],
+        "visibility": "PUBLIC",
+        "ref": "https://api.smartrecruiters.com/v1/companies/Canva/postings/6000000001608848",
+        "creator": {
+          "name": "Ashley Huang"
+        },
+        "language": {
+          "code": "en",
+          "label": "English",
+          "labelNative": "English (US)"
+        }
+      }
+    ]
+  },
+  "detail": {
+    "id": "6000000001608848",
+    "name": "Strategic Account Executive, Japan",
+    "applyUrl": "https://jobs.smartrecruiters.com/Canva/6000000001608848-strategic-account-executive-japan?oga=true",
+    "postingUrl": "https://jobs.smartrecruiters.com/Canva/6000000001608848-strategic-account-executive-japan",
+    "releasedDate": "2026-11-26T02:36:04.311Z",
+    "location": {
+      "city": "Tokyo",
+      "region": "Tokyo",
+      "country": "jp",
+      "remote": false,
+      "hybrid": true,
+      "latitude": "35.6803997",
+      "longitude": "139.7690174",
+      "fullLocation": "Tokyo, Tokyo, Japan"
+    },
+    "company": {
+      "name": "Canva",
+      "identifier": "Canva"
+    },
+    "jobAd": {
+      "sections": {
+        "companyDescription": {
+          "title": "Company Description",
+          "text": "<p><strong>About the Team</strong><br>\nOur Sales and Success team supports Canva Enterprise, with a mission to get Canva into the hands of every team, classroom and business in the world.<br>\nCanva Enterprise helps organisations bring design, content creation and collaboration together under one secure and centralised platform. From Whiteboards and Docs to Presentations and Magic Studio, we\u2019re helping teams across organisations create, communicate and collaborate at scale.<br>\nOur Sales team partners with customers across functions and industries to understand their biggest challenges, show what\u2019s possible with Canva and build lasting partnerships that help organisations unlock more value from visual communication. You\u2019ll work closely with teams across Customer Success, Product, Engineering and Post-Sales to help some of our largest customers transform the way they work.</p>"
+        },
+        "jobDescription": {
+          "title": "Job Description",
+          "text": "<p><strong>What you\u2019ll do (responsibilities)</strong></p><p>As Canva scales change continues to be part of our DNA. But we like to think that\u2019s all part of the fun. So this will give you the flavour of the type of things you\u2019ll be working on when you start, but this will likely evolve.<br>\nAt the moment, this role is focused on:</p><ul><li>Building and executing strategic account plans: You\u2019ll take a data-led approach to identifying, prioritising and engaging high-value enterprise opportunities. You\u2019ll analyse market dynamics, customer priorities and whitespace to translate strategy into focused account plans and sales activity.</li><li>Driving pipeline and revenue growth: You\u2019ll own complex sales cycles from prospecting through to close, building a healthy pipeline, forecasting accurately and using Salesforce to create visibility and momentum across your portfolio.</li><li>Leading complex enterprise engagements: You\u2019ll navigate large, matrixed organisations, multi-threading across stakeholders and building relationships with senior decision-makers to uncover business challenges and shape compelling solutions.</li><li>Putting customers at the centre: You\u2019ll use compelling storytelling, thoughtful discovery and a strong understanding of customer needs to create a sales experience that feels relevant, personalised and valuable.</li><li>Becoming a Canva product expert: You\u2019ll bring a deep understanding of Canva\u2019s products and solutions to customer conversations, connecting capab"
+        },
+        "qualifications": {
+          "title": "Qualifications",
+          "text": "<p><strong>What we're looking for</strong></p><ul><li><p>You have significant experience owning full-cycle enterprise sales, with a strong track record of new-logo acquisition and consistently delivering against ambitious revenue targets.</p></li><li><p>You\u2019ve worked with large, named accounts, ideally across complex or global organisations, and know how to build thoughtful account strategies that create momentum over time.</p></li><li><p>You\u2019re confident navigating complexity, uncovering business challenges and translating them into clear, commercially compelling solutions.</p></li><li><p>You know how to multi-thread across an organisation, build relationships with senior and executive stakeholders and create alignment across multiple decision-makers.</p></li><li><p>You can develop detailed account plans that bring together customer priorities, stakeholder maps, commercial opportunities and clear next steps.</p></li><li><p>You\u2019re a compelling communicator who can bring ideas to life in both virtual and face-to-face environments, particularly with senior audiences.</p></li><li><p>You have a strong track record of leading complex commercial negotiations and progressing opportunities through long, multi-stakeholder sales cycles.</p></li><li><p>You\u2019re comfortable operating in ambiguity, adapting quickly and maintaining momentum in a fast-moving environment.</p></li></ul><ul><li><p>You\u2019re naturally curious, customer-focused and motivated by helping organisations change the way th"
+        },
+        "additionalInformation": {
+          "title": "Additional Information",
+          "text": ""
+        }
+      }
+    }
+  }
+}
