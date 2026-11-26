@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Applykar</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <span class="mark">A</span>
+      <strong>Applykar</strong>
+    </header>
+    <section id="pair">
+      <label>App URL<input id="baseUrl" placeholder="http://127.0.0.1:4317" /></label>
+      <label>Pairing token<input id="token" placeholder="From Settings" /></label>
+      <button id="save" type="button">Pair</button>
+      <p id="pairError" class="error" hidden></p>
+    </section>
+    <section id="ready" hidden>
+      <label>Profile<select id="profile"></select></label>
+      <p class="hint">Recent</p>
+      <ul id="apps"></ul>
+      <button id="forget" type="button">Disconnect</button>
+    </section>
+    <script src="popup.js"></script>
+  </body>
+</html>
