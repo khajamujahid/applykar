@@ -51,6 +51,7 @@ type JobRow = {
   applyUrl: string;
   sourceUrl: string | null;
   postedAt: Date | null;
+  firstSeenAt?: Date | null;
   descriptionText?: string | null;
   saved: boolean | null;
   hidden: boolean | null;
@@ -86,6 +87,7 @@ function toScored(row: JobRow, profile: ProfileRecord, withDescription: boolean)
     applyUrl: row.applyUrl,
     sourceUrl: row.sourceUrl,
     postedAt: row.postedAt ? row.postedAt.toISOString() : null,
+    firstSeenAt: row.firstSeenAt ? row.firstSeenAt.toISOString() : null,
     skillTags: row.skillTags ?? [],
     saved: Boolean(row.saved),
     hidden: Boolean(row.hidden),
@@ -120,6 +122,7 @@ function selection(profileId: string) {
     applyUrl: jobs.applyUrl,
     sourceUrl: jobs.sourceUrl,
     postedAt: jobs.postedAt,
+    firstSeenAt: jobs.firstSeenAt,
     descriptionText: jobs.descriptionText,
     saved: jobStates.saved,
     hidden: jobStates.hidden,
@@ -155,7 +158,7 @@ export async function searchJobs(profileId: string, filters: JobFilters = {}): P
   if (tab === "liked") where.push(eq(jobStates.saved, true));
   if (tab === "applied") where.push(inArray(applications.status, ["applied", "interview", "rejected"]));
   if (tab === "external") where.push(eq(jobs.source, "captured"));
-  if (tab === "recommended") {
+  if (tab === "recommended" || tab === "newest") {
     const open = or(isNull(applications.status), inArray(applications.status, ["queued", "ready_for_review"]));
     if (open) where.push(open);
   }
@@ -170,7 +173,11 @@ export async function searchJobs(profileId: string, filters: JobFilters = {}): P
   const scored = rows
     .map((row) => toScored(row as JobRow, profile, false))
     .filter((job) => (tab === "applied" ? true : passesHardFilters(job, profile, filters) && matchesListing(job, filters)))
-    .sort((a, b) => b.score - a.score || (b.postedAt ?? "").localeCompare(a.postedAt ?? ""));
+    .sort((a, b) =>
+      tab === "newest"
+        ? (b.postedAt ?? "").localeCompare(a.postedAt ?? "") || b.score - a.score
+        : b.score - a.score || (b.postedAt ?? "").localeCompare(a.postedAt ?? ""),
+    );
   return { jobs: scored.slice(0, 80), total: scored.length };
 }
 

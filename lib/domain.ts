@@ -158,6 +158,7 @@ export type ScoredJob = {
   applyUrl: string;
   sourceUrl: string | null;
   postedAt: string | null;
+  firstSeenAt?: string | null;
   skillTags: string[];
   score: number;
   scoreNotes: string[];
@@ -183,7 +184,7 @@ export type JobFilters = {
   includeNonUs?: boolean;
   includeW2Only?: boolean;
   savedOnly?: boolean;
-  tab?: "recommended" | "liked" | "applied" | "external";
+  tab?: "recommended" | "newest" | "liked" | "applied" | "external";
   jobFunction?: string;
   title?: string;
   near?: string;

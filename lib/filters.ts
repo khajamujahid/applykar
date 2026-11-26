@@ -32,7 +32,7 @@ export function parseFilters(params: Params): JobFilters {
     includeLeadership: one(params.leadership) === "1",
     includeNonUs: one(params.anywhere) === "1",
     yoeMax: Number.isFinite(yoe) && yoe > 0 ? yoe : undefined,
-    tab: (["recommended", "liked", "applied", "external"] as const).find((tab) => tab === one(params.tab)) ?? "recommended",
+    tab: (["recommended", "newest", "liked", "applied", "external"] as const).find((tab) => tab === one(params.tab)) ?? "recommended",
     jobFunction: one(params.fn) || undefined,
     title: one(params.title) || undefined,
     near: one(params.near) || undefined,

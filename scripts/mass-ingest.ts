@@ -30,7 +30,7 @@ const STALE_PRUNE_DAYS = Number(process.env.INGEST_STALE_PRUNE_DAYS || 3);
 const started = Date.now();
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 6 });
 
-type Company = { id: string; name: string; slug: string; source: BoardSource };
+type Company = { id: string; name: string; slug: string; source: BoardSource; first_sync?: boolean };
 
 function readBoards(): { source: string; slug: string; name: string }[] {
   const rows: { source: string; slug: string; name: string }[] = [];
@@ -116,7 +116,8 @@ async function upsert(company: Company, normalized: NormalizedJob[]): Promise<{ 
       skill_tags: enriched.skillTags.slice(0, 12),
       apply_url: job.applyUrl,
       source_url: job.sourceUrl === job.applyUrl ? null : job.sourceUrl,
-      posted_at: job.postedAt?.toISOString() ?? null,
+      // Boards without dates: on later polls first-seen time is the posting time; on the very first sync it is unknown.
+      posted_at: job.postedAt?.toISOString() ?? (company.first_sync ? null : new Date().toISOString()),
       content_hash: sha256(`${job.title}|${job.locationRaw ?? ""}|${job.applyUrl}|${description.slice(0, DESC_CHARS)}|${enriched.salary.min ?? ""}`).slice(0, 16),
       dedupe_key: dedupeKey({ companyName: job.companyName || company.name, title: job.title, locationRaw: job.locationRaw, workplace: enriched.workplace }),
     });
@@ -129,7 +130,7 @@ async function upsert(company: Company, normalized: NormalizedJob[]): Promise<{ 
           no_sponsorship, skill_tags, apply_url, source_url, posted_at, content_hash, dedupe_key, last_seen_at, stale_at)
        SELECT company_id, source, external_id, title, company_name, description_text, location_raw, city, region, country,
           workplace, seniority, us_scope, yoe_min, salary_min, salary_max, salary_currency, salary_interval, w2_only, c2c_friendly,
-          no_sponsorship, skill_tags, apply_url, source_url, COALESCE(posted_at, now()), content_hash, dedupe_key, now(), NULL
+          no_sponsorship, skill_tags, apply_url, source_url, posted_at, content_hash, dedupe_key, now(), NULL
        FROM json_populate_recordset(NULL::jobs, $1::json)
        ON CONFLICT (source, external_id) DO UPDATE SET
           title = excluded.title, company_name = excluded.company_name,
@@ -155,7 +156,25 @@ async function upsert(company: Company, normalized: NormalizedJob[]): Promise<{ 
   return { added, us: rows.length };
 }
 
+const HOT_MINUTES = Number(process.env.INGEST_HOT_MINUTES || 50);
+
+/**
+ * Freshness first: boards that are hiring in the US (us_jobs > 0) are re-polled every run once they are
+ * older than HOT_MINUTES, newest-stale first. Only then does the run spend time on the long tail.
+ */
 async function claim(limit: number): Promise<Company[]> {
+  const hot = await pool.query<Company>(
+    `UPDATE companies SET last_synced_at = now()
+     WHERE id IN (
+       SELECT id FROM companies
+       WHERE enabled AND us_jobs > 0 AND source = ANY($2::job_source[])
+         AND last_synced_at < now() - ($3 || ' minutes')::interval
+       ORDER BY last_synced_at
+       LIMIT $1 FOR UPDATE SKIP LOCKED)
+     RETURNING id, name, slug, source, (open_jobs IS NULL) AS first_sync`,
+    [limit, BOARD_SOURCES, String(HOT_MINUTES)],
+  );
+  if (hot.rows.length) return hot.rows;
   const { rows } = await pool.query<Company>(
     `UPDATE companies SET last_synced_at = now()
      WHERE id IN (
@@ -163,7 +182,7 @@ async function claim(limit: number): Promise<Company[]> {
        WHERE enabled AND source = ANY($2::job_source[])
        ORDER BY last_synced_at NULLS FIRST
        LIMIT $1 FOR UPDATE SKIP LOCKED)
-     RETURNING id, name, slug, source`,
+     RETURNING id, name, slug, source, (open_jobs IS NULL) AS first_sync`,
     [limit, BOARD_SOURCES],
   );
   return rows;

@@ -12,3 +12,4 @@ CREATE INDEX IF NOT EXISTS companies_sync_idx ON companies (enabled, last_synced
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS open_jobs integer;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS us_jobs integer;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS fail_count integer NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS companies_hot_idx ON companies (last_synced_at) WHERE enabled AND us_jobs > 0;

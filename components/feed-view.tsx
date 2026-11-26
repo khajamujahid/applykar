@@ -39,6 +39,20 @@ export function FeedView({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [query, setQuery] = useState(filters.q ?? "");
+  // "New since last visit": remember the previous visit for this browser session, then stamp now.
+  const [since, setSince] = useState<string | null>(null);
+  useEffect(() => {
+    let value = sessionStorage.getItem("ak_since");
+    if (!value) {
+      value = localStorage.getItem("ak_last_visit") ?? new Date(Date.now() - 24 * 3600_000).toISOString();
+      sessionStorage.setItem("ak_since", value);
+      localStorage.setItem("ak_last_visit", new Date().toISOString());
+    }
+    const stamp = value;
+    const timer = window.setTimeout(() => setSince(stamp), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const newCount = since ? jobs.filter((job) => job.firstSeenAt && job.firstSeenAt > since).length : 0;
   const selectedIndex = Math.max(0, jobs.findIndex((job) => job.id === selected?.id));
   const active = jobs[selectedIndex] ?? selected;
 
@@ -105,7 +119,7 @@ export function FeedView({
     <div className="grid min-h-[calc(100vh-3rem)] lg:grid-cols-[minmax(0,1fr)_380px]">
       <section className="min-w-0 border-border lg:border-r">
         <div className="flex flex-wrap items-center gap-1 border-b border-border px-3 py-2">
-          {(["recommended", "liked", "applied", "external"] as const).map((tab) => (
+          {(["recommended", "newest", "liked", "applied", "external"] as const).map((tab) => (
             <a
               key={tab}
               href={`/feed${filtersToQuery({ ...filters, tab }, active?.id)}`}
@@ -114,6 +128,11 @@ export function FeedView({
               {tab}
             </a>
           ))}
+          {newCount > 0 ? (
+            <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[11px] font-medium text-emerald-600" data-testid="new-count">
+              {newCount} new since last visit
+            </span>
+          ) : null}
           <BulkApply initial={bulk} />
         </div>
         <form
@@ -261,6 +280,7 @@ export function FeedView({
                       {job.companyName} · {job.locationRaw || job.workplace} · {job.source}
                     </span>
                     <span className="mt-1 flex flex-wrap gap-1">
+                      {since && job.firstSeenAt && job.firstSeenAt > since ? <Badge className="bg-emerald-600 text-white" data-testid="new-badge">New</Badge> : null}
                       {job.salaryLabel ? <Badge variant="outline">{job.salaryLabel}</Badge> : null}
                       {job.c2cFriendly ? <Badge variant="secondary">C2C</Badge> : null}
                       {job.noSponsorship ? <Badge variant="outline">No sponsorship</Badge> : null}
