@@ -24,3 +24,8 @@ CREATE TABLE IF NOT EXISTS discovery_runs (
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS discovered_via text;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS discovered_at timestamptz;
 CREATE INDEX IF NOT EXISTS companies_source_lower_slug_idx ON companies (source, lower(slug));
+-- Foreign-key lookups: without these every deleted job seq-scans jobs (duplicate_of ON DELETE SET NULL).
+CREATE INDEX IF NOT EXISTS jobs_duplicate_of_idx ON jobs (duplicate_of) WHERE duplicate_of IS NOT NULL;
+CREATE INDEX IF NOT EXISTS job_states_job_idx ON job_states (job_id);
+CREATE INDEX IF NOT EXISTS applications_job_idx ON applications (job_id);
+CREATE INDEX IF NOT EXISTS bulk_items_job_idx ON bulk_items (job_id);
