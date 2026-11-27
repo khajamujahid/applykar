@@ -12,7 +12,7 @@ import { getDb } from "@/lib/db/client";
 import { applications, jobDetails, jobs, companies, ownerSettings, profiles, tailoredResumes } from "@/lib/db/schema";
 import type { ApplicationStatus } from "@/lib/domain";
 import { fetchJobDescription } from "@/lib/jobs/details";
-import { sourceFromUrl } from "@/lib/apply/hosts";
+import { applyTarget } from "@/lib/apply/hosts";
 import { mailWaiter } from "@/lib/apply/mail-wait";
 import { OWNER_NAME } from "@/lib/profile/defaults";
 import { getAnswers, getProfile, rememberQuestions } from "@/lib/services/profiles";
@@ -173,8 +173,9 @@ export async function processApplication(app: { id: string; profileId: string; j
     const tailored = await tailorForApplication(app, browser);
     await addEvent(app.id, "tailored", tailored ? `Tailored resume ready (match ${tailored.score}%)` : "No structured resume on this profile; using the uploaded resume");
     const job = (await getDb().select().from(jobs).where(eq(jobs.id, app.jobId)).limit(1))[0];
-    const source = job ? sourceFromUrl(job.applyUrl) : null;
-    if (!job || !source) {
+    const target = job ? applyTarget(job) : null;
+    const source = target?.source ?? null;
+    if (!job || !target || !source) {
       await addEvent(app.id, "needs_info", "This career site is not supported for background apply yet. Open the original job link to apply.", {
         status: "needs_info",
         missing: ["Unsupported application site"],
@@ -195,7 +196,7 @@ export async function processApplication(app: { id: string; profileId: string; j
     const page = await browser.newPage({ viewport: { width: 1280, height: 1600 } });
     const { applyOnPage } = await import("@/lib/apply/browser");
     const result = await applyOnPage(page as never, {
-      url: job.applyUrl,
+      url: target.url,
       source,
       employer: job.companyName,
       answers,

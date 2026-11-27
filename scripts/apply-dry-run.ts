@@ -7,7 +7,7 @@ import { sourceFromUrl } from "../lib/apply/hosts";
 import { defaultAnswers, OWNER_NAME } from "../lib/profile/defaults";
 
 const targets = [
-  ["greenhouse", "https://job-boards.greenhouse.io/airtable/jobs/7909563002"],
+  ["greenhouse", process.env.DRY_RUN_GREENHOUSE || "https://job-boards.greenhouse.io/airtable/jobs/7909563002"],
   ["lever", "https://jobs.lever.co/100ms/4c9f19c7-4432-4394-ba93-167319c68adc/apply"],
   ["ashby", "https://jobs.ashbyhq.com/notion/11e56782-ee28-4025-ba0e-76222b0bfcea/application"],
   ["workday", process.env.DRY_RUN_WORKDAY || "https://2020companies.wd1.myworkdayjobs.com/external_careers/job/Bronx-NY/Google-TV-Experience-Manager_REQ_116514"],

@@ -122,3 +122,23 @@ describe("stale blank custom questions", () => {
     expect(matchAnswerKey("Are you currently based in the United States?", answers)).toBe("q_x");
   });
 });
+
+describe("dry-run findings (Nov 27)", () => {
+  it("ticks a lone consent checkbox for an affirmative answer only", () => {
+    const opt = ["By checking this box, I agree to allow Encora to store and process my data."];
+    expect(matchOption("Yes", opt)).toBe(opt[0]);
+    expect(matchOption("No", opt)).toBeNull();
+  });
+  it("maps data-processing consent and 'begin work' availability", () => {
+    expect(matchAnswerKey("By checking this box, I agree to allow Encora to store and process my data for the purpose of considering my eligibility")).toBe("privacy_consent");
+    expect(matchAnswerKey("When are you available to begin work at Encora?")).toBe("availability");
+  });
+  it("routes Greenhouse boards on company domains to the hosted form", async () => {
+    const { applyTarget } = await import("@/lib/apply/hosts");
+    expect(applyTarget({ source: "greenhouse", externalId: "roblox:8283619", applyUrl: "https://careers.roblox.com/jobs/8283619?gh_jid=8283619" })?.url).toBe(
+      "https://job-boards.greenhouse.io/embed/job_app?for=roblox&token=8283619",
+    );
+    expect(applyTarget({ source: "lever", externalId: "x", applyUrl: "https://jobs.lever.co/a/b/apply" })?.source).toBe("lever");
+    expect(applyTarget({ source: "recruitee", externalId: "x", applyUrl: "https://careers.example.com/o/x" })).toBeNull();
+  });
+});

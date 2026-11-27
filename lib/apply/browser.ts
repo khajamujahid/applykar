@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "playwright";
 import type { AnswerRecord } from "@/lib/domain";
+import { matchOption } from "@/lib/profile/answer-catalog";
 import { planForm, type Applicant, type FormQuestion } from "@/lib/apply/plan";
 import { assertApplyHost, type ApplySource } from "@/lib/apply/hosts";
 
@@ -51,6 +52,47 @@ function controlLocator(page: Page, id: string) {
   return page.locator(`#${cssEscape(id)}`).first();
 }
 
+async function fillControl(page: Page, id: string, value: string): Promise<void> {
+  const control = controlLocator(page, id);
+  const tag = await control.evaluate((node: Element) => node.tagName.toLowerCase()).catch(() => "");
+  if (!tag) return;
+  if (tag === "select") {
+    await control.selectOption({ label: value }).catch(() => undefined);
+    return;
+  }
+  const combo = await control.evaluate((node: Element) => node.getAttribute("role") === "combobox" || node.hasAttribute("aria-autocomplete")).catch(() => false);
+  if (combo) {
+    // React-select style pickers: open, then choose the matching option from the list.
+    await control.click({ timeout: 3_000 }).catch(() => undefined);
+    // Only this picker's open list (pages keep other hidden lists, e.g. phone country codes, in the DOM).
+    const listId = await control.evaluate((node: Element) => node.getAttribute("aria-controls") || node.getAttribute("aria-owns") || "").catch(() => "");
+    const optionSel = listId ? `[id="${listId}"] [role='option']` : "[role='option']:visible";
+    const options = page.locator(optionSel);
+    await options.first().waitFor({ timeout: 2_500 }).catch(() => undefined);
+    const texts = (await options.allInnerTexts().catch(() => [] as string[])).map((t) => t.replace(/\s+/g, " ").trim());
+    // Short lists: pick directly. Long lists (countries) are filtered by typing first.
+    const pick = texts.length && texts.length <= 25 ? matchOption(value, texts) : null;
+    if (pick && texts.includes(pick)) {
+      await options.nth(texts.indexOf(pick)).click({ timeout: 3_000 }).catch(() => undefined);
+      return;
+    }
+    await control.fill(value).catch(() => undefined);
+    const typed = page.locator(optionSel).first();
+    if (await typed.waitFor({ timeout: 2_500 }).then(() => true).catch(() => false)) {
+      const after = (await page.locator(optionSel).allInnerTexts().catch(() => [] as string[])).map((t) => t.replace(/\s+/g, " ").trim());
+      const best = matchOption(value, after);
+      await page.locator(optionSel).nth(best && after.includes(best) ? after.indexOf(best) : 0).click({ timeout: 3_000 }).catch(() => undefined);
+    } else await control.press("Enter").catch(() => undefined);
+    return;
+  }
+  await control.fill(value).catch(() => undefined);
+  const current = await control.inputValue().catch(() => "");
+  if (current !== value) {
+    await control.click().catch(() => undefined);
+    await control.pressSequentially(value, { delay: 0 }).catch(() => undefined);
+  }
+}
+
 export async function applyOnPage(page: Page, request: ApplyRequest, options?: { skipNavigation?: boolean }): Promise<ApplyResult> {
   assertApplyHost(request.url);
   if (request.source === "workday" || request.source === "icims") {
@@ -60,6 +102,9 @@ export async function applyOnPage(page: Page, request: ApplyRequest, options?: {
   if (!options?.skipNavigation) {
     await page.goto(request.url, { waitUntil: "domcontentloaded", timeout: 45_000 });
     await page.locator("form label, form input").first().waitFor({ timeout: 12_000 }).catch(() => undefined);
+    // React boards (Greenhouse, Ashby) re-render after hydration and wipe anything typed earlier.
+    await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
+    await page.waitForTimeout(800);
   }
   const questions = await readQuestions(page, request.source);
   if (questions.length === 0) {
@@ -75,29 +120,31 @@ export async function applyOnPage(page: Page, request: ApplyRequest, options?: {
       for (let index = 0; index < count; index += 1) {
         const input = inputs.nth(index);
         const inputId = await input.getAttribute("id");
-        const optionText = inputId
-          ? ((await page.locator(`label[for="${inputId}"]`).first().innerText().catch(() => "")) || "").replace(/\s+/g, " ").trim()
-          : "";
+        const forLabel = inputId ? (await page.locator(`label[for="${inputId}"]`).first().innerText().catch(() => "")) || "" : "";
+        // Lever/Recruitee wrap the radio in its label (no id); fall back to the wrapping label, then the value.
+        const wrapped = forLabel ? "" : await input.evaluate((node: Element) => node.closest("label")?.textContent ?? (node as HTMLInputElement).value ?? "").catch(() => "");
+        const optionText = (forLabel || wrapped).replace(/\s+/g, " ").trim();
         if (optionText.toLowerCase() === answer.value.toLowerCase()) {
-          await input.check({ force: true });
+          const ok = await input.check({ force: true, timeout: 5_000 }).then(() => true).catch(() => false);
+          // Custom-styled boxes (Ashby) sometimes reject a direct check; click the visible label instead.
+          if (!ok) await input.evaluate((node: Element) => (node.closest("label") as HTMLElement | null)?.click()).catch(() => undefined);
           break;
         }
       }
       continue;
     }
+    await fillControl(page, answer.id, answer.value);
+  }
+  // Second pass: anything a late re-render cleared gets typed again.
+  await page.waitForTimeout(1_000);
+  for (const answer of plan.answers) {
+    if (answer.kind === "choice") continue;
     const control = controlLocator(page, answer.id);
     const tag = await control.evaluate((node: Element) => node.tagName.toLowerCase()).catch(() => "");
-    if (!tag) continue;
-    if (tag === "select") {
-      await control.selectOption({ label: answer.value }).catch(() => undefined);
-      continue;
-    }
-    await control.fill(answer.value).catch(() => undefined);
-    const current = await control.inputValue().catch(() => "");
-    if (current !== answer.value) {
-      await control.click().catch(() => undefined);
-      await control.pressSequentially(answer.value, { delay: 0 });
-    }
+    if (!tag || tag === "select") continue;
+    if (await control.evaluate((node: Element) => node.getAttribute("role") === "combobox").catch(() => false)) continue;
+    const current = await control.inputValue().catch(() => answer.value);
+    if (!current.trim()) await fillControl(page, answer.id, answer.value);
   }
   const filled = plan.answers.map((answer) => ({ question: answer.label, answer: answer.value }));
   if (plan.resume && request.resumeFilePath) {
@@ -120,8 +167,9 @@ export async function applyOnPage(page: Page, request: ApplyRequest, options?: {
   const screenshotPath = path.join(shotDir, `${Date.now()}-${request.source}.png`);
   const formShot = page.locator("form").first();
   const shoot = async () => {
-    if ((await formShot.count()) > 0) await formShot.screenshot({ path: screenshotPath });
-    else await page.screenshot({ path: screenshotPath, fullPage: true });
+    // A form that keeps re-rendering can't be element-captured; fall back to the page, and never fail the run over a proof image.
+    const ok = (await formShot.count()) > 0 && (await formShot.screenshot({ path: screenshotPath, timeout: 10_000 }).then(() => true).catch(() => false));
+    if (!ok) await page.screenshot({ path: screenshotPath, fullPage: true, timeout: 15_000 }).catch(() => undefined);
   };
   const challenge = page.locator(".h-captcha, .g-recaptcha:not([data-size='invisible']), .cf-turnstile");
   if (!plan.ready || !request.submit) {

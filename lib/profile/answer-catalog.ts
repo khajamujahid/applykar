@@ -50,7 +50,7 @@ export const ANSWER_CATALOG: CatalogEntry[] = [
 
   // Job preferences
   { key: "interview_preference", group: "Job preferences", label: "Interview preference", question: "Interview format preference", answer: "Remote / virtual interviews preferred", match: /interview (format|preference|availability)|virtual interview/i },
-  { key: "availability", group: "Job preferences", label: "Start date / notice", question: "When can you start? (notice period)", answer: "Immediately", match: /start date|when can you start|available to start|availability|notice period|earliest (start|date|available)|how soon/i },
+  { key: "availability", group: "Job preferences", label: "Start date / notice", question: "When can you start? (notice period)", answer: "Immediately", match: /start date|when can you start|available to (start|begin)|begin work|availability|notice period|earliest (start|date|available)|how soon/i },
   { key: "salary_hourly", group: "Job preferences", label: "Hourly rate (C2C)", question: "Desired hourly / C2C rate", answer: "$65 per hour or higher (C2C)", match: /hourly|per hour|bill rate|\brate\b/i },
   { key: "salary_expectation", group: "Job preferences", label: "Desired salary", question: "Desired salary", answer: "$95,000–$120,000 per year (or C2C at $65/hr+)", match: /salary|compensation|pay expectation|desired pay|expected pay|pay range|\bwages?\b/i },
   { key: "employment_type", group: "Job preferences", label: "Employment type", question: "What type of employment are you looking for?", answer: "I prefer corp-to-corp (C2C). I skip W-2-only roles.", match: /employment type|type of employment|corp-?to-?corp|\bc2c\b|\bw-?2\b|\b1099\b|contract or full|engagement type/i },
@@ -69,7 +69,7 @@ export const ANSWER_CATALOG: CatalogEntry[] = [
   { key: "non_compete", group: "Background", label: "Non-compete / agreements", question: "Are you bound by a non-compete or other agreement?", answer: "No", match: /non-?compete|non-?solicit|restrictive covenant|agreement.{0,60}(prevent|restrict|limit)|bound by/i },
   { key: "criminal_conviction", group: "Background", label: "Criminal conviction", question: "Have you ever been convicted of a crime?", answer: "No", match: /convicted|conviction|felony|misdemeanor|criminal/i },
   { key: "background_check_consent", group: "Background", label: "Background check / drug test", question: "Will you consent to a background check and drug test?", answer: "Yes", match: /background (check|screen|investigation)|drug (test|screen)/i },
-  { key: "privacy_consent", group: "Background", label: "Privacy / data consent", question: "Do you agree to the privacy notice and data processing?", answer: "Yes", match: /privacy (policy|notice|statement)|data (processing|privacy)|consent to (the )?(processing|collection)|gdpr/i },
+  { key: "privacy_consent", group: "Background", label: "Privacy / data consent", question: "Do you agree to the privacy notice and data processing?", answer: "Yes", match: /privacy (policy|notice|statement)|data (processing|privacy)|consent to (the )?(processing|collection)|gdpr|(store|process|retain)( and process)? my (personal )?(data|information)/i },
   { key: "date_of_birth", group: "Background", label: "Date of birth (only if asked)", question: "Date of birth", answer: "January 20, 1989", match: /date of birth|birth ?date|\bdob\b/i },
   { key: "english", group: "Background", label: "English proficiency", question: "Are you fluent in English?", answer: "Yes", match: /english/i },
   { key: "languages", group: "Background", label: "Languages", question: "Which languages do you speak?", answer: "English", match: /languages? (do )?you (speak|know)|spoken languages?|what languages|language proficiency|languages spoken/i },
@@ -170,6 +170,8 @@ const DECLINE_RE = /prefer not|decline|don'?t wish|do not wish|not wish to|choos
 export function matchOption(value: string, options: string[]): string | null {
   const opts = options.map((o) => o.trim()).filter(Boolean);
   if (opts.length === 0) return value;
+  // A lone checkbox ("By checking this box, I agree…") is ticked for an affirmative answer.
+  if (opts.length === 1 && /^(yes|y|true|i agree|agree|accept|acknowledge)/i.test(value.trim())) return opts[0]!;
   const low = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
   const alts = [value, ...value.split(/\s*(?:\/|;|\bor\b|–|—|\(|\))\s*/i)].map((s) => s.trim()).filter((s) => s.length > 0);
   for (const alt of alts) {
