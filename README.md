@@ -129,4 +129,4 @@ pnpm test:e2e
     Common Crawl URL index (newest crawl + two older ones in rotation), Workable's public US job search (companies hiring
     now), and every known company name tried as a slug on the other ATS (~200k checks/day, rotating). Rejects are
     remembered for 30 days; each run is logged in `discovery_runs` and in the Actions run summary. It stops adding boards
-    if the database is above 900 MB; the ingest's job-row guard (above) is unchanged.
+    if the database is above 950 MB; the ingest's job-row guard (above) is unchanged.

@@ -31,7 +31,7 @@ const DRY = process.env.DISCOVER_DRY === "1"; // box testing: no DB, known set f
 const MAX_MINUTES = Number(process.env.DISCOVER_MAX_MINUTES || 45);
 const CONCURRENCY = Number(process.env.DISCOVER_CONCURRENCY || 48);
 const NAME_PROBES = Number(process.env.DISCOVER_NAME_PROBES || 200_000);
-const HARD_CAP_MB = Number(process.env.DISCOVER_HARD_CAP_MB || 900);
+const HARD_CAP_MB = Number(process.env.DISCOVER_HARD_CAP_MB || 950);
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
 const started = Date.now();
 const minutesLeft = () => MAX_MINUTES - (Date.now() - started) / 60_000;
