@@ -103,6 +103,11 @@ export function parseYoe(text: string): number | null {
     const value = match[1];
     if (value) collect(value);
   }
+  // "2 years of AGM experience", "3 yrs of hands-on Python experience"
+  for (const match of remaining.matchAll(/(\d+)\s*(?:years|yrs)\s+of\s+(?:[\w/+.-]+\s+){1,4}experience\b/gi)) {
+    const value = match[1];
+    if (value) collect(value);
+  }
   for (const match of remaining.matchAll(/(\d+)\s*(?:years|yrs)\s+(?:of\s+)?(?:relevant\s+)?(?:professional\s+)?experience\b/gi)) {
     const value = match[1];
     if (value) collect(value);

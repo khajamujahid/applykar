@@ -30,8 +30,9 @@ const DESC_CHARS = Number(process.env.INGEST_DESC_CHARS || 500);
 // counted in live job rows; the physical size is only an emergency brake.
 const MAX_JOBS = Number(process.env.INGEST_MAX_JOBS || 600_000);
 const HARD_MB = Number(process.env.INGEST_HARD_MB || 950);
-const RETAIN_DAYS = Number(process.env.INGEST_RETAIN_DAYS || 60);
-let retainDays = RETAIN_DAYS; // tightened (down to 21 days) when the row budget is still exceeded after compaction
+const RETAIN_DAYS = Number(process.env.INGEST_RETAIN_DAYS || 7); // Khaja only wants postings from the last 7 days
+const MIN_RETAIN_DAYS = Math.min(3, RETAIN_DAYS);
+let retainDays = RETAIN_DAYS; // tightened (down to 3 days) when the row budget is still exceeded after compaction
 const STALE_PRUNE_DAYS = Number(process.env.INGEST_STALE_PRUNE_DAYS || 3);
 const started = Date.now();
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 6 });
@@ -228,6 +229,12 @@ async function liveJobs(): Promise<number> {
 }
 
 async function maintain(force = false) {
+  // Retention: drop postings older than the window. Rows without a posted date (boards whose API has none) are kept
+  // while open so re-polls don't present them as new; they are removed once the board stops listing them.
+  await pool.query(`DELETE FROM jobs j WHERE posted_at < now() - ($1 || ' days')::interval
+    AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.job_id = j.id)
+    AND NOT EXISTS (SELECT 1 FROM job_states s WHERE s.job_id = j.id)
+    AND NOT EXISTS (SELECT 1 FROM bulk_items b WHERE b.job_id = j.id)`, [String(retainDays)]);
   await pool.query(`DELETE FROM jobs j WHERE stale_at < now() - ($1 || ' days')::interval
     AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.job_id = j.id)
     AND NOT EXISTS (SELECT 1 FROM job_states s WHERE s.job_id = j.id)
@@ -272,8 +279,8 @@ async function main() {
           console.log(`storage: ${live} live jobs / ${size.rows[0].mb}MB over budget; compacting`);
           await maintain(true);
           compacted = true;
-        } else if (retainDays > 21) {
-          retainDays = Math.max(21, retainDays - 15);
+        } else if (retainDays > MIN_RETAIN_DAYS) {
+          retainDays = Math.max(MIN_RETAIN_DAYS, retainDays - 2);
           console.log(`still over budget; keeping only jobs posted within ${retainDays} days`);
           await maintain(true);
         } else if (coldAllowed) {

@@ -114,8 +114,8 @@ pnpm test:e2e
   - `ingest.yml` hourly at :05 — `pnpm ingest:mass`: re-polls every US-hiring board older than 50 min first (freshness), then the long tail
     of `data/boards.tsv.gz` (~73k public ATS boards: Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Workday, iCIMS, Recruitee,
     BambooHR, Breezy, Rippling, JazzHR). US jobs only, 500-char snippets, closed jobs marked stale and pruned after 3 days, dedupe, vacuum,
-    storage guard for Neon's 1 GB free branch: at most 600k live job rows (and 950 MB on disk), jobs posted more than
-    60 days ago are not stored; over budget it compacts, tightens retention step by step to 21 days, then refreshes hiring
+    storage guard for Neon's 1 GB free branch: at most 600k live job rows (and 950 MB on disk), only jobs posted in the last
+    7 days are kept (older postings are pruned every run and never stored); over budget it compacts, tightens retention to 3 days, then refreshes hiring
     boards only. A quarter of every batch goes to never-synced boards so new discoveries start polling within the hour.
   - `apply-worker.yml` at :12 and :24 (inside the ingest window so Neon is already awake) — processes the Apply-20 queue with Playwright.
     Never guesses: required questions without a saved answer are flagged, not submitted.
