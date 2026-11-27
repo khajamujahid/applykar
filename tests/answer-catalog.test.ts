@@ -142,3 +142,7 @@ describe("dry-run findings (Nov 27)", () => {
     expect(applyTarget({ source: "recruitee", externalId: "x", applyUrl: "https://careers.example.com/o/x" })).toBeNull();
   });
 });
+
+it("matches 'over the age of 18'", () => {
+  expect(matchAnswerKey("Are you over the age of 18?")).toBe("age_18");
+});

@@ -155,7 +155,12 @@ async function fillWorkdayStep(page: Page, request: ApplyRequest): Promise<strin
 export async function applyWorkday(page: Page, request: ApplyRequest): Promise<ApplyResult> {
   await page.goto(request.url, { waitUntil: "domcontentloaded", timeout: 60_000 });
   const apply = page.locator("[data-automation-id='adventureButton']").first();
-  await apply.waitFor({ timeout: 20_000 });
+  const found = await apply.waitFor({ timeout: 20_000 }).then(() => true).catch(() => false);
+  if (!found) {
+    const text = (await page.locator("body").innerText().catch(() => "")).slice(0, 3000);
+    const closed = /doesn'?t exist|no longer (available|accepting|open)|job (posting )?(is )?(closed|filled|removed)|page not found/i.test(text);
+    return { status: "failed", missing: [], proofNote: null, screenshotPath: null, error: closed ? "This job posting is closed or was removed by the employer." : "The Workday page has no Apply button (the posting may be closed). Open the original job link." };
+  }
   await apply.click();
   const manual = page.locator("[data-automation-id='applyManually']").first();
   if (await manual.isVisible({ timeout: 8000 }).catch(() => false)) await manual.click();

@@ -40,7 +40,7 @@ export const ANSWER_CATALOG: CatalogEntry[] = [
   { key: "portfolio", group: "Contact", label: "Portfolio / website", question: "Portfolio or personal website", answer: "https://portfolio-one-theta-71.vercel.app", match: /portfolio|personal (web)?site|^website|website url|\bblog\b|other (website|link|url)/i },
 
   // Work eligibility
-  { key: "age_18", group: "Work eligibility", label: "18 or older", question: "Are you at least 18 years old?", answer: "Yes", match: /\b18\b.*(years|older|age)|over 18|at least 18|legal (working )?age|age of majority/i },
+  { key: "age_18", group: "Work eligibility", label: "18 or older", question: "Are you at least 18 years old?", answer: "Yes", match: /\b18\b.*(years|older|age)|over 18|at least 18|age of 18|\b18\+|legal (working )?age|age of majority/i },
   { key: "sponsorship", group: "Work eligibility", label: "Needs sponsorship", question: "Will you now or in the future require visa sponsorship?", answer: "No. I do not need sponsorship now or in the future.", match: /sponsor|h-?1b/i },
   { key: "us_citizen", group: "Work eligibility", label: "U.S. citizen", question: "Are you a U.S. citizen?", answer: "No. I am a U.S. lawful permanent resident (Green Card holder).", match: /\bu\.?\s?s\.? citizen|united states citizen|are you a citizen|citizenship status/i },
   { key: "immigration_status", group: "Work eligibility", label: "Work authorization type", question: "What is your current work authorization / immigration status?", answer: "U.S. Permanent Resident (Green Card)", match: /immigration status|visa status|current (work )?(authori[sz]ation|visa|immigration) status|type of (work )?(authori[sz]ation|visa)|authori[sz]ation (type|status)/i },
