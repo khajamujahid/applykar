@@ -92,6 +92,15 @@ export async function queueApply(profileId: string, jobId: string): Promise<{ id
 }
 
 /** Atomically move up to `limit` queued applications to Applying. */
+/** Applications stuck in "applying" (the function was cut off) are failed, not retried, so a bad page can't loop and burn quota. */
+export async function failStuckApplications(): Promise<void> {
+  await getDb().execute(sql`
+    UPDATE applications
+    SET status = 'failed', updated_at = now(),
+        events = coalesce(events, '[]'::jsonb) || jsonb_build_array(jsonb_build_object('at', now(), 'kind', 'failed', 'text', 'Timed out while filling the form. Use Retry on this application or open the original job link.'))
+    WHERE status = 'applying' AND updated_at < now() - interval '10 minutes'`);
+}
+
 export async function claimQueued(limit: number, onlyId?: string): Promise<{ id: string; profileId: string; jobId: string }[]> {
   const result = await getDb().execute(sql`
     UPDATE applications SET status = 'applying', updated_at = now()
@@ -236,4 +245,31 @@ export async function appliedToday(): Promise<number> {
   const rows = await getDb().execute(sql`SELECT count(*)::int AS n FROM applications WHERE applied_at >= date_trunc('day', now())`);
   const list = ("rows" in rows ? rows.rows : rows) as { n: number }[];
   return Number(list[0]?.n ?? 0);
+}
+
+/** Work the queue for up to `budgetMs`; if jobs remain, hand off to a fresh function run (each run is time-boxed). */
+export async function drainQueue(launch: Parameters<typeof processApplication>[1], options: { ids?: string[]; budgetMs?: number; origin?: string } = {}): Promise<number> {
+  const started = Date.now();
+  const budget = options.budgetMs ?? 230_000;
+  let processed = 0;
+  await failStuckApplications().catch(() => undefined);
+  const ids = options.ids ? [...options.ids] : null;
+  while (Date.now() - started < budget) {
+    const nextId = ids ? ids.shift() : undefined;
+    if (ids && nextId === undefined) break;
+    const [claimed] = await claimQueued(1, nextId);
+    if (!claimed) {
+      if (ids) continue;
+      break;
+    }
+    await processApplication(claimed, launch);
+    processed += 1;
+  }
+  const remaining = await getDb().execute(sql`SELECT 1 FROM applications WHERE status = 'queued' LIMIT 1`);
+  const rows = "rows" in remaining ? remaining.rows : remaining;
+  const secret = process.env.WORKER_SECRET || process.env.CRON_SECRET;
+  if ((rows as unknown[]).length && secret && options.origin) {
+    await fetch(`${options.origin}/api/apply/run`, { method: "POST", headers: { authorization: `Bearer ${secret}` }, signal: AbortSignal.timeout(5_000) }).catch(() => undefined);
+  }
+  return processed;
 }

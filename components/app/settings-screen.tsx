@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Bell, Check, Copy, Cpu, Shield, UserRound, Zap } from "lucide-react";
-import { saveSettingsAction, signOutAction } from "@/app/actions";
+import { saveAtsPasswordAction, saveSettingsAction, signOutAction } from "@/app/actions";
 import { ExtensionPair } from "@/components/extension-pair";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
@@ -16,7 +16,7 @@ const NAV = [
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
-export function SettingsScreen({ email, settings, mcp, ai, answers }: { email: string; settings: Settings; mcp: { url: string; token: string | null }; ai: { configured: boolean; model: string }; answers?: { total: number; blank: number } }) {
+export function SettingsScreen({ email, settings, mcp, ai, answers }: { email: string; settings: Settings; mcp: { url: string; token: string | null }; ai: { configured: boolean; model: string }; answers?: { total: number; blank: number; hasAtsPassword: boolean } }) {
   const [s, setS] = useState(settings);
   const [, start] = useTransition();
   const [section, setSection] = useState("auto-apply");
@@ -54,6 +54,7 @@ export function SettingsScreen({ email, settings, mcp, ai, answers }: { email: s
               <Row label={`${answers.total} saved answers`} hint={answers.blank ? `${answers.blank} still need an answer. The bot copies these into Workday, iCIMS, Greenhouse, Lever and Ashby forms.` : "Every saved question has an answer. The bot copies these into every application form."}>
                 <a href="/profiles#saved-answers" className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-[12.5px] font-medium text-white">Edit answers</a>
               </Row>
+              <AtsPassword has={answers.hasAtsPassword} />
             </Card>
           ) : null}
           <Card id="auto-apply" title="Auto-apply">
@@ -103,7 +104,7 @@ export function SettingsScreen({ email, settings, mcp, ai, answers }: { email: s
               Connect ChatGPT / Claude / Grok
             </button>
             <p className="mt-3 text-[12px] text-muted-foreground">
-              Applykar AI: Vercel AI Gateway · {ai.model} · {ai.configured ? "key set" : "not configured"}. If the gateway is unavailable the assistant and tailoring use the built-in rules engine.
+              AI model: Vercel AI Gateway · {ai.model} · {ai.configured ? "key set (answers only after a card is added on Vercel)" : "not configured"}. Until then the assistant and resume tailoring use the built-in rules engine, which is free.
             </p>
           </Card>
           <Card id="notifications" title="Notifications">
@@ -144,6 +145,33 @@ export function SettingsScreen({ email, settings, mcp, ai, answers }: { email: s
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function AtsPassword({ has }: { has: boolean }) {
+  const [value, setValue] = useState("");
+  const [state, setState] = useState<string | null>(has ? "Saved" : null);
+  const [pending, start] = useTransition();
+  return (
+    <div className="border-t border-border pt-3 text-[13.5px]">
+      <p className="font-medium">Career-site account password</p>
+      <p className="mt-0.5 text-[12px] text-muted-foreground">Workday and iCIMS make you create an account per employer. The bot uses this password (with your login email) to create them. Use a password you don&apos;t use anywhere else.</p>
+      <form
+        className="mt-2 flex items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          start(async () => {
+            const r = await saveAtsPasswordAction(value);
+            setState(r.ok ? (value.trim() ? "Saved" : "Cleared") : r.error);
+            setValue("");
+          });
+        }}
+      >
+        <input type="password" autoComplete="new-password" value={value} onChange={(e) => setValue(e.target.value)} placeholder={has ? "•••••••• (saved, type to replace)" : "At least 8 characters"} className="h-9 flex-1 rounded-lg border border-input px-3 text-[13px] outline-none focus:border-primary" />
+        <button type="submit" disabled={pending || !value} className="h-9 rounded-lg bg-primary px-4 text-[13px] font-medium text-white disabled:opacity-50">Save</button>
+        {state ? <span className="text-[12px] text-muted-foreground">{state}</span> : null}
+      </form>
     </div>
   );
 }

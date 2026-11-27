@@ -23,9 +23,14 @@ export function gatewayToken(): string | null {
   return process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN || null;
 }
 
+// After a billing / verification refusal, skip the gateway for a while so every chat message doesn't pay a failed round trip.
+let blocked: { until: number; error: string } | null = null;
+const BLOCK_MS = 30 * 60_000;
+
 export async function chat(messages: ChatMessage[], options: { tools?: ToolSpec[]; json?: boolean; timeoutMs?: number } = {}): Promise<ChatResult> {
   const token = gatewayToken();
   if (!token) return { ok: false, code: "not_configured", error: "AI Gateway is not configured (AI_GATEWAY_API_KEY)." };
+  if (blocked && blocked.until > Date.now()) return { ok: false, code: "billing", error: blocked.error };
   try {
     const response = await fetch(`${GATEWAY_URL}/chat/completions`, {
       method: "POST",
@@ -47,6 +52,7 @@ export async function chat(messages: ChatMessage[], options: { tools?: ToolSpec[
     if (!response.ok) {
       const message = body.error?.message ?? `AI Gateway returned ${response.status}`;
       const billing = body.error?.type === "customer_verification_required" || /credit card|credits|budget/i.test(message);
+      if (billing || response.status === 401 || response.status === 403) blocked = { until: Date.now() + BLOCK_MS, error: message };
       return { ok: false, code: billing ? "billing" : "http", error: message };
     }
     const msg = body.choices?.[0]?.message;

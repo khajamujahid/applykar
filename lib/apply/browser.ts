@@ -63,7 +63,9 @@ export async function applyOnPage(page: Page, request: ApplyRequest, options?: {
   }
   const questions = await readQuestions(page, request.source);
   if (questions.length === 0) {
-    return { status: "failed", missing: [], proofNote: null, screenshotPath: null, error: "No application form was found." };
+    const text = (await page.locator("body").innerText().catch(() => "")).slice(0, 4000);
+    const closed = /couldn'?t find anything here|no longer (available|accepting|open)|(posting|job|position) (has been |was )?(closed|filled|removed)|page not found|\b404\b/i.test(text);
+    return { status: "failed", missing: [], proofNote: null, screenshotPath: null, error: closed ? "This job posting is closed or was removed by the employer." : "No application form was found." };
   }
   const plan = planForm(questions, request.answers, request.applicant);
   for (const answer of plan.answers) {

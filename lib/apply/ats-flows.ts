@@ -159,10 +159,18 @@ export async function applyWorkday(page: Page, request: ApplyRequest): Promise<A
   await apply.click();
   const manual = page.locator("[data-automation-id='applyManually']").first();
   if (await manual.isVisible({ timeout: 8000 }).catch(() => false)) await manual.click();
-  await page.waitForTimeout(4000);
+  // Serverless Chromium renders slower: wait for whichever comes first (account wall, sign-in, or the first form step).
+  await page
+    .locator(
+      "[data-automation-id='createAccountSubmitButton'], [data-automation-id='createAccountLink'], [data-automation-id='SignInWithEmailButton'], [data-automation-id='email'], [data-automation-id='pageFooterNextButton'], [data-automation-id='bottom-navigation-next-button']",
+    )
+    .first()
+    .waitFor({ timeout: 30_000 })
+    .catch(() => undefined);
+  await page.waitForTimeout(1500);
 
   // Account wall: some tenants require "Create Account" before the form.
-  const createAccount = page.locator("[data-automation-id='createAccountSubmitButton'], [data-automation-id='createAccountLink']").first();
+  const createAccount = page.locator("[data-automation-id='createAccountSubmitButton'], [data-automation-id='createAccountLink'], [data-automation-id='SignInWithEmailButton']").first();
   const signInEmail = page.locator("[data-automation-id='email']").first();
   if ((await createAccount.count()) > 0 || (await signInEmail.isVisible().catch(() => false))) {
     const password = savedValue(request.answers, "ats_password");
@@ -174,6 +182,11 @@ export async function applyWorkday(page: Page, request: ApplyRequest): Promise<A
         proofNote: "Workday requires an account for this employer. Stopped before creating it.",
         screenshotPath,
       };
+    }
+    const withEmail = page.locator("[data-automation-id='SignInWithEmailButton']").first();
+    if (await withEmail.isVisible().catch(() => false)) {
+      await withEmail.click();
+      await page.waitForTimeout(2000);
     }
     const link = page.locator("[data-automation-id='createAccountLink']").first();
     if (await link.isVisible().catch(() => false)) await link.click();
@@ -197,7 +210,15 @@ export async function applyWorkday(page: Page, request: ApplyRequest): Promise<A
   }
 
   for (let step = 0; step < 10; step += 1) {
-    await page.locator("[data-automation-id='pageFooterNextButton'], [data-automation-id='bottom-navigation-next-button']").first().waitFor({ timeout: 20_000 });
+    const ready = await page
+      .locator("[data-automation-id='pageFooterNextButton'], [data-automation-id='bottom-navigation-next-button']")
+      .first()
+      .waitFor({ timeout: 30_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!ready) {
+      return { status: "failed", missing: [], proofNote: null, screenshotPath: await shot(page, "workday"), error: "The Workday application form did not load (no Next button). Open the original job link to apply." };
+    }
     await page.locator("[data-automation-id^='formField-']").first().waitFor({ timeout: 25_000 }).catch(() => undefined);
     await page.waitForTimeout(1500);
     const missing = await fillWorkdayStep(page, request);

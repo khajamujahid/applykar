@@ -43,8 +43,9 @@ export const ANSWER_CATALOG: CatalogEntry[] = [
   { key: "age_18", group: "Work eligibility", label: "18 or older", question: "Are you at least 18 years old?", answer: "Yes", match: /\b18\b.*(years|older|age)|over 18|at least 18|legal (working )?age|age of majority/i },
   { key: "sponsorship", group: "Work eligibility", label: "Needs sponsorship", question: "Will you now or in the future require visa sponsorship?", answer: "No. I do not need sponsorship now or in the future.", match: /sponsor|h-?1b/i },
   { key: "us_citizen", group: "Work eligibility", label: "U.S. citizen", question: "Are you a U.S. citizen?", answer: "No. I am a U.S. lawful permanent resident (Green Card holder).", match: /\bu\.?\s?s\.? citizen|united states citizen|are you a citizen|citizenship status/i },
-  { key: "immigration_status", group: "Work eligibility", label: "Work authorization type", question: "What is your current work authorization / immigration status?", answer: "U.S. Permanent Resident (Green Card)", match: /immigration status|visa status|current (work )?status|type of (work )?(authori[sz]ation|visa)|authori[sz]ation (type|status)/i },
+  { key: "immigration_status", group: "Work eligibility", label: "Work authorization type", question: "What is your current work authorization / immigration status?", answer: "U.S. Permanent Resident (Green Card)", match: /immigration status|visa status|current (work )?(authori[sz]ation|visa|immigration) status|type of (work )?(authori[sz]ation|visa)|authori[sz]ation (type|status)/i },
   { key: "work_authorization", group: "Work eligibility", label: "Authorized to work in the U.S.", question: "Are you legally authorized to work in the United States?", answer: "Yes. I am a U.S. lawful permanent resident (Green Card holder).", match: /authori[sz]ed to work|work authori[sz]ation|legally (authori[sz]ed|eligible|permitted)|eligible to work|right to work|employment eligibility/i },
+  { key: "based_in_us", group: "Work eligibility", label: "Based in the U.S.", question: "Are you currently based in the United States?", answer: "Yes", match: /(currently )?(based|located|residing|reside|living|live) in the (united states|u\.?s\.?a?\b)|u\.?s\.?[- ]based/i },
   { key: "security_clearance", group: "Work eligibility", label: "Security clearance", question: "Do you have an active U.S. security clearance?", answer: "No active clearance", match: /clearance/i },
 
   // Job preferences
@@ -90,7 +91,14 @@ export const ANSWER_CATALOG: CatalogEntry[] = [
   { key: "eeo_disability", group: "Voluntary disclosures (EEO)", label: "Disability status", question: "Disability status", answer: DECLINE, match: /disabilit/i },
 ];
 
+/** Matching order: yes/no and preference questions first, so e.g. "sponsorship ... in your current location" never hits the location field. */
+const MATCH_GROUPS: AnswerGroup[] = ["Work eligibility", "Background", "Voluntary disclosures (EEO)", "Job preferences", "Education", "Contact"];
+export const MATCH_ORDER: CatalogEntry[] = MATCH_GROUPS.flatMap((g) => ANSWER_CATALOG.filter((e) => e.group === g));
+
 export const CATALOG_KEYS = new Set(ANSWER_CATALOG.map((e) => e.key));
+
+/** Saved answers that are secrets: never returned to the extension, MCP clients or the AI assistant. */
+export const SECRET_ANSWER_KEYS = new Set(["ats_password"]);
 
 /** Keys that hold secrets or are edited elsewhere (Personal info form); never listed as questions. */
 export const HIDDEN_ANSWER_KEYS = new Set(["ats_password", "full_name", "email", "remote", "job_type"]);
@@ -137,13 +145,15 @@ export function similarity(a: string, b: string): number {
 
 /** Which saved-answer key a form label maps to: catalog pattern first, then the closest custom question. */
 export function matchAnswerKey(label: string, answers: AnswerRecord[] = []): string | null {
+  const explicit = /\(saved answer ([a-z0-9_]+)\)/i.exec(label);
+  if (explicit) return explicit[1];
   const text = cleanQuestion(label);
   if (!text) return null;
   const custom = answers.filter((a) => !CATALOG_KEYS.has(a.key));
   const norm = (s: string) => cleanQuestion(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const exact = custom.find((a) => norm(a.question) === norm(text) || a.key === customAnswerKey(text));
   if (exact) return exact.key;
-  const entry = ANSWER_CATALOG.find((e) => e.match.test(text));
+  const entry = MATCH_ORDER.find((e) => e.match.test(text));
   if (entry) return entry.key;
   let best: { key: string; score: number } | null = null;
   for (const a of custom) {

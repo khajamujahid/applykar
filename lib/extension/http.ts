@@ -1,3 +1,4 @@
+import { SECRET_ANSWER_KEYS } from "@/lib/profile/answer-catalog";
 import { extensionTokenIsValid, bearerToken } from "@/lib/extension/auth";
 import { listApplications } from "@/lib/services/applications";
 import { ensureOwner, getAnswers, listProfiles, setActiveProfile } from "@/lib/services/profiles";
@@ -32,7 +33,7 @@ export async function extensionSnapshot() {
       company: item.companyName,
       status: item.status,
     })),
-    answers: answers.map((answer) => ({ key: answer.key, question: answer.question, answer: answer.answer })),
+    answers: answers.filter((answer) => !SECRET_ANSWER_KEYS.has(answer.key)).map((answer) => ({ key: answer.key, question: answer.question, answer: answer.answer })),
   };
 }
 

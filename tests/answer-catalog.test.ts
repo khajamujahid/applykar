@@ -50,12 +50,18 @@ const cases: [string, string][] = [
   ["Veteran Status", "eeo_veteran"],
   ["Disability Status", "eeo_disability"],
   ["Sexual Orientation", "eeo_sexual_orientation"],
+  ["Will you now or in the future require sponsorship for a visa to remain in your current location?", "sponsorship"],
+  ["Are you currently based in the United States?", "based_in_us"],
+  ["What is your current country of residence?", "country"],
+  ["What is your current employment status?", "currently_employed"],
+  ["Are you subject to any employment agreements and/or post-employment restrictions with your current employer?", "non_compete"],
+  ["Have you previously worked at or consulted for GitLab?", "previous_worker"],
 ];
 
 describe("answer catalog", () => {
   it("has unique keys and at least 50 questions", () => {
     expect(new Set(ANSWER_CATALOG.map((e) => e.key)).size).toBe(ANSWER_CATALOG.length);
-    expect(defaultAnswers().length).toBeGreaterThanOrEqual(50);
+    expect(defaultAnswers().length).toBeGreaterThanOrEqual(57);
   });
   it.each(cases)("maps %s", (label, key) => {
     expect(matchAnswerKey(label)).toBe(key);
@@ -89,5 +95,16 @@ describe("answer catalog", () => {
   it("keeps the extension rules in sync with the catalog", () => {
     const source = readFileSync("extension/page-logic.js", "utf8");
     expect(syncedSource(source)).toBe(source);
+  });
+});
+
+describe("secrets and explicit keys", () => {
+  it("never treats the career-site password as shareable", async () => {
+    const { SECRET_ANSWER_KEYS } = await import("@/lib/profile/answer-catalog");
+    expect(SECRET_ANSWER_KEYS.has("ats_password")).toBe(true);
+  });
+  it("maps '(saved answer key)' labels straight to that key", async () => {
+    const { matchAnswerKey } = await import("@/lib/profile/answer-catalog");
+    expect(matchAnswerKey("Workday account password (saved answer ats_password)")).toBe("ats_password");
   });
 });

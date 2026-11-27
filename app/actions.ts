@@ -295,6 +295,16 @@ export async function saveAnswerAction(key: string, question: string, answer: st
   revalidatePath("/profiles");
 }
 
+/** Password the bot uses to create career-site accounts (Workday / iCIMS). Stored like other saved answers, never displayed. */
+export async function saveAtsPasswordAction(password: string) {
+  const value = password.trim();
+  if (value.length > 0 && value.length < 8) return { ok: false as const, error: "Use at least 8 characters" };
+  const id = await targetProfileId();
+  await updateAnswers(id, [{ key: "ats_password", question: "Career-site account password (Workday / iCIMS)", answer: value }]);
+  revalidatePath("/settings");
+  return { ok: true as const };
+}
+
 /** Add a custom saved answer (any question the owner wants the bot to answer). */
 export async function addCustomAnswerAction(question: string, answer: string, profileId?: string) {
   const { cleanQuestion, customAnswerKey } = await import("@/lib/profile/answer-catalog");

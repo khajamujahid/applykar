@@ -228,7 +228,7 @@ export function ApplicationScreen({
                   {app.missing.map((q) => (
                     <label key={q} className="block space-y-1">
                       <span className="text-[12.5px]">{q}</span>
-                      <input name={`q:${q}`} className="input" />
+                      <input name={`q:${q}`} type={/password/i.test(q) ? "password" : "text"} autoComplete="off" className="input" />
                     </label>
                   ))}
                   <button type="submit" className="h-9 rounded-lg bg-primary px-4 text-[13px] font-medium text-white">

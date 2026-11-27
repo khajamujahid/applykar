@@ -7,6 +7,7 @@ import { getLatestCode, getVerifyLink } from "@/lib/inbox/store";
 import { ingestBatch, isBoardSource } from "@/lib/ingest/run";
 import { listApplications, queueApplication, updateApplicationStatus } from "@/lib/services/applications";
 import { getJob, hideJob, listSaved, saveJob, searchJobs } from "@/lib/services/jobs";
+import { SECRET_ANSWER_KEYS } from "@/lib/profile/answer-catalog";
 import { ensureOwner, getAnswers, listProfiles, setActiveProfile, updateAnswers } from "@/lib/services/profiles";
 
 function text(value: unknown) {
@@ -158,7 +159,8 @@ export function createMcpServer(): McpServer {
     { description: "Get the active job profile, its filters, and saved answers.", inputSchema: {} },
     async () => {
       const profile = await activeProfile();
-      const answers = await getAnswers(profile.id);
+      // Secrets (career-site password) never leave the app.
+      const answers = (await getAnswers(profile.id)).filter((a) => !SECRET_ANSWER_KEYS.has(a.key));
       const profiles = await listProfiles(profile.email);
       return text({ active: profile, answers, profiles: profiles.map((item) => ({ id: item.id, name: item.name })) });
     },
@@ -174,7 +176,8 @@ export function createMcpServer(): McpServer {
     },
     async ({ answers }) => {
       const profile = await activeProfile();
-      return text(await updateAnswers(profile.id, answers));
+      const saved = await updateAnswers(profile.id, answers.filter((a) => !SECRET_ANSWER_KEYS.has(a.key)));
+      return text(saved.filter((a) => !SECRET_ANSWER_KEYS.has(a.key)));
     },
   );
 

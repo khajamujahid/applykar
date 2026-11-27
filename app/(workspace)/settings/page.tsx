@@ -11,7 +11,9 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const { email, profile } = await currentProfile();
-  const saved = (await getAnswers(profile.id)).filter((a) => !HIDDEN_ANSWER_KEYS.has(a.key));
+  const allAnswers = await getAnswers(profile.id);
+  const saved = allAnswers.filter((a) => !HIDDEN_ANSWER_KEYS.has(a.key));
+  const hasAtsPassword = allAnswers.some((a) => a.key === "ats_password" && a.answer.trim().length > 0);
   const row = (await getDb().select().from(ownerSettings).where(eq(ownerSettings.id, "owner")).limit(1))[0];
   const base = (process.env.APPLYKAR_URL || process.env.AUTH_URL || "").replace(/\/$/, "");
   return (
@@ -26,7 +28,7 @@ export default async function SettingsPage() {
         notifyEmail: row?.notifyEmail ?? true,
       }}
       mcp={{ url: `${base}/api/mcp`, token: process.env.MCP_BEARER_TOKEN ?? null }}
-      answers={{ total: saved.length, blank: saved.filter((a) => !a.answer.trim()).length }}
+      answers={{ total: saved.length, blank: saved.filter((a) => !a.answer.trim()).length, hasAtsPassword }}
       ai={{ configured: Boolean(gatewayToken()), model: process.env.AI_GATEWAY_MODEL || "google/gemini-2.5-flash" }}
     />
   );

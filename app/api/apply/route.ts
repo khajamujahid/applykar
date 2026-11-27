@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { apiProfile, unauthorized } from "@/lib/api-auth";
-import { claimQueued, processApplication, queueApply } from "@/lib/apply/pipeline";
+import { drainQueue, queueApply } from "@/lib/apply/pipeline";
 import { launchChromium } from "@/lib/resume/pdf";
 
 export const dynamic = "force-dynamic";
@@ -15,13 +15,11 @@ export async function POST(request: Request) {
   if (!ids.length) return Response.json({ error: "jobId required" }, { status: 400 });
   const queued: { jobId: string; id: string; status: string }[] = [];
   for (const jobId of ids) queued.push({ jobId, ...(await queueApply(owner.profile.id, jobId)) });
+  const origin = new URL(request.url).origin;
   after(async () => {
-    // Work through what this request queued, one at a time (each claim is atomic, so the worker can share the queue).
-    for (const item of queued) {
-      if (item.status !== "queued") continue;
-      const [claimed] = await claimQueued(1, item.id);
-      if (claimed) await processApplication(claimed, launchChromium);
-    }
+    // Work through what this request queued (claims are atomic, so the GitHub worker can share the queue); time-boxed, then hands off.
+    const ids = queued.filter((item) => item.status === "queued").map((item) => item.id);
+    if (ids.length) await drainQueue(launchChromium, { ids, origin });
   });
   return Response.json({ queued });
 }
