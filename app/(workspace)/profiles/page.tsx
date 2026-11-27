@@ -4,6 +4,12 @@ import { currentProfile } from "@/lib/current";
 import { getDb } from "@/lib/db/client";
 import { profiles as profilesTable } from "@/lib/db/schema";
 import { OWNER_NAME, maxProfiles } from "@/lib/profile/defaults";
+import { ANSWER_CATALOG, HIDDEN_ANSWER_KEYS, catalogEntry } from "@/lib/profile/answer-catalog";
+
+const order = (key: string) => {
+  const i = ANSWER_CATALOG.findIndex((e) => e.key === key);
+  return i < 0 ? 10_000 : i;
+};
 import type { ResumeData } from "@/lib/resume/types";
 import { getAnswers, listProfiles } from "@/lib/services/profiles";
 
@@ -29,7 +35,13 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
     remote: get("remote") || (selected.locations.some((l) => /remote/i.test(l)) ? "Yes" : "No"),
     jobType: get("job_type") || (selected.prefersC2c ? "Contract (C2C), Full-time" : "Full-time"),
   };
-  const saved = answers.filter((a) => !["full_name", "email", "phone", "linkedin", "location", "remote", "job_type"].includes(a.key) && !a.key.startsWith("eeo_"));
+  const saved = answers
+    .filter((a) => !HIDDEN_ANSWER_KEYS.has(a.key))
+    .map((a) => {
+      const entry = catalogEntry(a.key);
+      return { key: a.key, question: entry?.question ?? a.question, answer: a.answer, label: entry?.label ?? a.question, group: entry?.group ?? "Custom questions", custom: !entry };
+    })
+    .sort((x, y) => order(x.key) - order(y.key));
   return (
     <ProfilesScreen
       profiles={all.map((x) => ({ id: x.id, name: x.name, resumeFilename: x.resumeFilename, years: x.yearsExperience, tags: x.targetTitles.slice(0, 3), isDefault: x.id === active.id }))}

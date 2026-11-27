@@ -3,24 +3,15 @@
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Brain, Check, CloudUpload, FileText, Loader2, Pencil, Plus } from "lucide-react";
-import { newProfileAction, saveAnswerAction, saveProfileDetailsAction, setDefaultProfileAction, uploadResumeAction } from "@/app/actions";
+import { Brain, Check, CloudUpload, FileText, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { addCustomAnswerAction, deleteCustomAnswerAction, newProfileAction, saveAnswerAction, saveProfileDetailsAction, setDefaultProfileAction, uploadResumeAction } from "@/app/actions";
 
 type ProfileCard = { id: string; name: string; resumeFilename: string | null; years: number | null; tags: string[]; isDefault: boolean };
 type Selected = { id: string; name: string; titles: string; locations: string; salary: string; years: number | null; resumeFilename: string | null; structured: boolean };
+type SavedItem = { key: string; question: string; answer: string; label: string; group: string; custom: boolean };
 type Personal = { name: string; email: string; phone: string; linkedin: string; location: string; remote: string; jobType: string };
 
-const LABELS: Record<string, string> = {
-  work_authorization: "Work authorization",
-  sponsorship: "Sponsorship",
-  willing_to_relocate: "Relocate",
-  availability: "Start date",
-  salary_expectation: "Salary",
-  employment_type: "Engagement",
-  work_location: "Work location",
-};
-
-export function ProfilesScreen({ profiles, max, selected, personal, answers }: { profiles: ProfileCard[]; max: number; selected: Selected; personal: Personal; answers: { key: string; question: string; answer: string }[] }) {
+export function ProfilesScreen({ profiles, max, selected, personal, answers }: { profiles: ProfileCard[]; max: number; selected: Selected; personal: Personal; answers: SavedItem[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
@@ -124,16 +115,66 @@ export function ProfilesScreen({ profiles, max, selected, personal, answers }: {
           </div>
         </form>
 
-        <div className="mt-5 rounded-xl border border-border p-5">
-          <Section title="Saved answers">
-            <div className="grid gap-3 md:grid-cols-3">
-              {answers.map((a) => (
-                <SavedAnswer key={a.key} item={a} label={LABELS[a.key] ?? a.question} />
-              ))}
-            </div>
-          </Section>
+        <SavedAnswers profileId={selected.id} answers={answers} />
+      </div>
+    </div>
+  );
+}
+
+const GROUP_ORDER = ["Contact", "Work eligibility", "Job preferences", "Background", "Education", "Voluntary disclosures (EEO)", "Custom questions"];
+
+function SavedAnswers({ profileId, answers }: { profileId: string; answers: SavedItem[] }) {
+  const router = useRouter();
+  const [filter, setFilter] = useState<"all" | "blank">("all");
+  const [q, setQ] = useState("");
+  const [a, setA] = useState("");
+  const [pending, start] = useTransition();
+  const blank = answers.filter((x) => !x.answer.trim()).length;
+  const shown = filter === "blank" ? answers.filter((x) => !x.answer.trim()) : answers;
+  const groups = GROUP_ORDER.map((g) => ({ g, items: shown.filter((x) => x.group === g) })).filter((x) => x.items.length);
+  return (
+    <div id="saved-answers" className="mt-5 rounded-xl border border-border p-5">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-[14.5px] font-semibold">Saved answers <span className="ml-1 rounded-full bg-[#f1effd] px-2 py-0.5 text-[11.5px] font-medium text-[#2f2496]">{answers.length} questions</span></h2>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">The background bot copies these into every application form (Workday, iCIMS, Greenhouse, Lever, Ashby…). New questions it can&apos;t answer are added here blank, to fill once.</p>
+        </div>
+        <div className="flex rounded-lg border border-input p-0.5 text-[12.5px]">
+          <button type="button" onClick={() => setFilter("all")} className={`rounded-md px-3 py-1 ${filter === "all" ? "bg-primary text-white" : ""}`}>All</button>
+          <button type="button" onClick={() => setFilter("blank")} className={`rounded-md px-3 py-1 ${filter === "blank" ? "bg-primary text-white" : ""}`}>Needs answer ({blank})</button>
         </div>
       </div>
+      {groups.map(({ g, items }) => (
+        <div key={g} className="mt-4">
+          <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[#6b6a80]">{g}</h3>
+          <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+            {items.map((item) => (
+              <SavedAnswer key={item.key} item={item} profileId={profileId} />
+            ))}
+          </div>
+        </div>
+      ))}
+      {groups.length === 0 ? <p className="mt-4 text-[13px] text-muted-foreground">Every question has an answer.</p> : null}
+      <form
+        className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!q.trim()) return;
+          start(async () => {
+            await addCustomAnswerAction(q, a, profileId);
+            setQ("");
+            setA("");
+            router.refresh();
+          });
+        }}
+      >
+        <span className="text-[13px] font-medium">Add a question</span>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Question as it appears on forms" className="h-9 min-w-[260px] flex-1 rounded-lg border border-input px-3 text-[13px] outline-none focus:border-primary" />
+        <input value={a} onChange={(e) => setA(e.target.value)} placeholder="Your answer" className="h-9 min-w-[200px] flex-1 rounded-lg border border-input px-3 text-[13px] outline-none focus:border-primary" />
+        <button type="submit" disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-[13px] font-medium text-white disabled:opacity-60">
+          {pending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Add
+        </button>
+      </form>
     </div>
   );
 }
@@ -156,26 +197,29 @@ function Inline({ label, name, defaultValue }: { label: string; name: string; de
   );
 }
 
-function SavedAnswer({ item, label }: { item: { key: string; question: string; answer: string }; label: string }) {
+function SavedAnswer({ item, profileId }: { item: SavedItem; profileId: string }) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(item.answer);
   const [pending, start] = useTransition();
+  const save = () => start(async () => (await saveAnswerAction(item.key, item.question, value, profileId), setEditing(false), router.refresh()));
+  const empty = !value.trim();
   return (
-    <div className="flex min-h-10 items-center gap-2 rounded-lg border border-input bg-white px-3 py-1.5 text-[13px]" title={item.question}>
-      <span className="shrink-0 text-[#3f3e55]">{label}:</span>
+    <div className={`flex min-h-10 items-center gap-2 rounded-lg border bg-white px-3 py-1.5 text-[13px] ${empty && !editing ? "border-[#f0c36d] bg-[#fffbf1]" : "border-input"}`} title={item.question}>
+      <span className="max-w-[48%] shrink-0 truncate text-[#3f3e55]">{item.label}:</span>
       {editing ? (
-        <input autoFocus value={value} onChange={(e) => setValue(e.target.value)} className="min-w-0 flex-1 bg-transparent outline-none" onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), start(async () => (await saveAnswerAction(item.key, item.question, value), setEditing(false))))} />
+        <input autoFocus value={value} onChange={(e) => setValue(e.target.value)} className="min-w-0 flex-1 bg-transparent outline-none" onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), save())} />
       ) : (
-        <span className="min-w-0 flex-1 truncate">{value}</span>
+        <span className={`min-w-0 flex-1 truncate ${empty ? "italic text-[#b07a12]" : ""}`}>{empty ? "Needs answer" : value}</span>
       )}
-      <button
-        type="button"
-        aria-label={editing ? "Save answer" : "Edit answer"}
-        onClick={() => (editing ? start(async () => (await saveAnswerAction(item.key, item.question, value), setEditing(false))) : setEditing(true))}
-        className="shrink-0 rounded p-1 text-[#3f3e55] hover:bg-muted"
-      >
+      <button type="button" aria-label={editing ? "Save answer" : "Edit answer"} onClick={() => (editing ? save() : setEditing(true))} className="shrink-0 rounded p-1 text-[#3f3e55] hover:bg-muted">
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : editing ? <Check className="size-3.5" /> : <Pencil className="size-3.5" />}
       </button>
+      {item.custom ? (
+        <button type="button" aria-label="Delete question" onClick={() => start(async () => (await deleteCustomAnswerAction(item.key, profileId), router.refresh()))} className="shrink-0 rounded p-1 text-[#9a3b3b] hover:bg-muted">
+          <Trash2 className="size-3.5" />
+        </button>
+      ) : null}
     </div>
   );
 }

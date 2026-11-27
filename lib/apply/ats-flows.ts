@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import type { Locator, Page } from "playwright";
 import { planForm, savedValue, type FormQuestion } from "@/lib/apply/plan";
+import { matchOption } from "@/lib/profile/answer-catalog";
 import type { ApplyRequest, ApplyResult } from "@/lib/apply/browser";
 
 async function shot(page: Page, source: string): Promise<string> {
@@ -57,11 +58,20 @@ function workdayValue(field: WorkdayField, request: ApplyRequest): string | null
       return savedValue(answers, "phone_type") ?? "Mobile";
     case "countryPhoneCode":
     case "country":
-      return savedValue(answers, "country") ?? (/united states|usa/i.test(savedValue(answers, "work_authorization") ?? "") ? "United States of America" : null);
+    {
+      const country = savedValue(answers, "country") ?? (/united states|u\.s\.|usa/i.test(savedValue(answers, "work_authorization") ?? "") ? "United States" : null);
+      return country && /^(united states|usa|us|u\.s\.a?\.?)$/i.test(country.trim()) ? "United States of America" : country;
+    }
     case "addressLine1":
       return savedValue(answers, "address_line1");
     case "city":
       return savedValue(answers, "city");
+    case "addressLine2":
+      return savedValue(answers, "address_line2");
+    case "legalName--middleName":
+      return null;
+    case "preferredName--firstName":
+      return savedValue(answers, "preferred_name");
     case "countryRegion":
       return savedValue(answers, "state_region");
     case "postalCode":
@@ -81,7 +91,10 @@ async function fillWorkdayField(page: Page, field: WorkdayField, value: string):
   const c = field.container;
   const radio = c.locator("input[type='radio']");
   if ((await radio.count()) > 0) {
-    const option = c.locator(`label:text-is("${value}")`).first();
+    const labels = (await c.locator("label").allInnerTexts().catch(() => [] as string[])).map((t) => t.trim()).filter(Boolean);
+    const pick = matchOption(value, labels);
+    if (!pick) return false;
+    const option = c.locator("label").filter({ hasText: pick }).first();
     if ((await option.count()) === 0) return false;
     await option.click({ force: true });
     return true;
@@ -89,7 +102,10 @@ async function fillWorkdayField(page: Page, field: WorkdayField, value: string):
   const button = c.locator("button[aria-haspopup='listbox']").first();
   if ((await button.count()) > 0) {
     await button.click();
-    const option = page.locator(`[role='option']:has-text("${value}")`).first();
+    await page.locator("[role='option']").first().waitFor({ timeout: 3000 }).catch(() => undefined);
+    const texts = (await page.locator("[role='option']").allInnerTexts().catch(() => [] as string[])).map((t) => t.trim()).filter(Boolean);
+    const pick = matchOption(value, texts) ?? value;
+    const option = page.locator("[role='option']").filter({ hasText: pick }).first();
     if (!(await option.isVisible({ timeout: 3000 }).catch(() => false))) {
       await page.keyboard.press("Escape");
       return false;

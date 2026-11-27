@@ -4,11 +4,14 @@ import { currentProfile } from "@/lib/current";
 import { getDb } from "@/lib/db/client";
 import { ownerSettings } from "@/lib/db/schema";
 import { gatewayToken } from "@/lib/ai/gateway";
+import { HIDDEN_ANSWER_KEYS } from "@/lib/profile/answer-catalog";
+import { getAnswers } from "@/lib/services/profiles";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const { email } = await currentProfile();
+  const { email, profile } = await currentProfile();
+  const saved = (await getAnswers(profile.id)).filter((a) => !HIDDEN_ANSWER_KEYS.has(a.key));
   const row = (await getDb().select().from(ownerSettings).where(eq(ownerSettings.id, "owner")).limit(1))[0];
   const base = (process.env.APPLYKAR_URL || process.env.AUTH_URL || "").replace(/\/$/, "");
   return (
@@ -23,6 +26,7 @@ export default async function SettingsPage() {
         notifyEmail: row?.notifyEmail ?? true,
       }}
       mcp={{ url: `${base}/api/mcp`, token: process.env.MCP_BEARER_TOKEN ?? null }}
+      answers={{ total: saved.length, blank: saved.filter((a) => !a.answer.trim()).length }}
       ai={{ configured: Boolean(gatewayToken()), model: process.env.AI_GATEWAY_MODEL || "google/gemini-2.5-flash" }}
     />
   );

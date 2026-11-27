@@ -1,9 +1,10 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { SENIORITIES, type AnswerRecord, type ProfileInput, type ProfileRecord, type Seniority } from "@/lib/domain";
 import { getDb } from "@/lib/db/client";
 import { ownerSettings, profiles, standardAnswers } from "@/lib/db/schema";
 import { applicationAddress } from "@/lib/inbox/extract";
 import { defaultAnswers, defaultProfile, maxProfiles } from "@/lib/profile/defaults";
+import { CATALOG_KEYS, cleanQuestion, customAnswerKey, matchAnswerKey } from "@/lib/profile/answer-catalog";
 
 function asSeniority(values: string[]): Seniority[] {
   return values.filter((value): value is Seniority => (SENIORITIES as readonly string[]).includes(value));
@@ -60,11 +61,54 @@ export async function getProfile(id: string, email = ""): Promise<ProfileRecord 
   return row ? toProfile(row, email) : null;
 }
 
+/**
+ * Merge the full default answer set into a profile: add missing keys and fill answers that are still blank.
+ * Never overwrites a non-blank answer the owner set.
+ */
+export async function mergeDefaultAnswers(profileId: string, existing?: { key: string; answer: string }[]): Promise<number> {
+  const rows = existing ?? (await getDb().select({ key: standardAnswers.key, answer: standardAnswers.answer }).from(standardAnswers).where(eq(standardAnswers.profileId, profileId)));
+  const have = new Map(rows.map((r) => [r.key, r.answer]));
+  const add = defaultAnswers().filter((d) => !have.has(d.key));
+  const fill = defaultAnswers().filter((d) => have.has(d.key) && !(have.get(d.key) ?? "").trim() && d.answer.trim());
+  if (add.length) await insertAnswers(profileId, add);
+  for (const d of fill) {
+    await getDb()
+      .update(standardAnswers)
+      .set({ answer: d.answer, updatedAt: new Date() })
+      .where(and(eq(standardAnswers.profileId, profileId), eq(standardAnswers.key, d.key), sql`trim(${standardAnswers.answer}) = ''`));
+  }
+  return add.length + fill.length;
+}
+
+/** Save questions the bot could not answer as blank saved answers (fill once, reused on every later form). */
+export async function rememberQuestions(profileId: string, labels: string[]): Promise<number> {
+  const answers = await getAnswers(profileId);
+  const fresh: AnswerRecord[] = [];
+  for (const raw of labels) {
+    const question = cleanQuestion(raw);
+    if (!question || question.length > 300 || /unsupported application site/i.test(question)) continue;
+    if (matchAnswerKey(question, answers)) continue;
+    const key = customAnswerKey(question);
+    if (!fresh.some((f) => f.key === key)) fresh.push({ key, question, answer: "" });
+  }
+  if (fresh.length) await insertAnswers(profileId, fresh);
+  return fresh.length;
+}
+
+export async function deleteAnswer(profileId: string, key: string): Promise<void> {
+  await getDb().delete(standardAnswers).where(and(eq(standardAnswers.profileId, profileId), eq(standardAnswers.key, key)));
+}
+
 export async function getAnswers(profileId: string): Promise<AnswerRecord[]> {
-  const rows = await getDb()
+  let rows = await getDb()
     .select()
     .from(standardAnswers)
     .where(eq(standardAnswers.profileId, profileId));
+  const keys = new Set(rows.map((r) => r.key));
+  if (CATALOG_KEYS.size && [...CATALOG_KEYS].some((k) => !keys.has(k))) {
+    await mergeDefaultAnswers(profileId, rows);
+    rows = await getDb().select().from(standardAnswers).where(eq(standardAnswers.profileId, profileId));
+  }
   return rows
     .map((row) => ({ key: row.key, question: row.question, answer: row.answer }))
     .sort((a, b) => a.key.localeCompare(b.key));

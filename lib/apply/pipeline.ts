@@ -15,7 +15,7 @@ import { fetchJobDescription } from "@/lib/jobs/details";
 import { sourceFromUrl } from "@/lib/apply/hosts";
 import { mailWaiter } from "@/lib/apply/mail-wait";
 import { OWNER_NAME } from "@/lib/profile/defaults";
-import { getAnswers, getProfile } from "@/lib/services/profiles";
+import { getAnswers, getProfile, rememberQuestions } from "@/lib/services/profiles";
 import { tailorResume } from "@/lib/resume/tailor";
 import { resumePdf } from "@/lib/resume/pdf";
 import type { ResumeData } from "@/lib/resume/types";
@@ -193,7 +193,7 @@ export async function processApplication(app: { id: string; profileId: string; j
       resumeText: profile?.resumeText ?? "",
       resumeFilename: profile?.resumeFilename ?? null,
       resumeFilePath,
-      applicant: { name: OWNER_NAME, email },
+      applicant: { name: OWNER_NAME, email, yearsExperience: profile?.yearsExperience ?? null },
       submit,
       verification: mailWaiter(app.profileId, new Date()),
     });
@@ -212,6 +212,8 @@ export async function processApplication(app: { id: string; profileId: string; j
       return "ready_for_review";
     }
     if (result.status === "skipped" && result.missing.length) {
+      const saved = await rememberQuestions(app.profileId, result.missing).catch(() => 0);
+      if (saved) await addEvent(app.id, "saved_questions", `Added ${saved} new question${saved > 1 ? "s" : ""} to your saved answers (Profiles) to fill once`).catch(() => undefined);
       await addEvent(app.id, "needs_info", `Needs ${result.missing.length} answer${result.missing.length > 1 ? "s" : ""} before it can be submitted`, {
         ...common,
         status: "needs_info",

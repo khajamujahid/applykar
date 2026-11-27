@@ -251,8 +251,10 @@ export async function tailorNowAction(applicationId: string) {
   }
 }
 
-function answerKey(question: string) {
-  return `q_${question.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 60)}`;
+async function answerKey(question: string, profileId: string) {
+  const { matchAnswerKey, customAnswerKey } = await import("@/lib/profile/answer-catalog");
+  const { getAnswers } = await import("@/lib/services/profiles");
+  return matchAnswerKey(question, await getAnswers(profileId)) ?? customAnswerKey(question);
 }
 
 /** Save answers for the questions an application was missing, then queue it again. */
@@ -260,10 +262,14 @@ export async function answerAndRetryAction(applicationId: string, formData: Form
   const { profile } = await currentProfile();
   const pairs = [...formData.entries()].filter(([k, v]) => k.startsWith("q:") && String(v).trim());
   if (pairs.length) {
-    await updateAnswers(
-      profile.id,
-      pairs.map(([k, v]) => ({ key: answerKey(k.slice(2)), question: k.slice(2), answer: String(v).trim() })),
-    );
+    const { catalogEntry, cleanQuestion } = await import("@/lib/profile/answer-catalog");
+    const items = [];
+    for (const [k, v] of pairs) {
+      const question = cleanQuestion(k.slice(2));
+      const key = await answerKey(question, profile.id);
+      items.push({ key, question: catalogEntry(key)?.question ?? question, answer: String(v).trim() });
+    }
+    await updateAnswers(profile.id, items);
   }
   const { getDb } = await import("@/lib/db/client");
   const { applications } = await import("@/lib/db/schema");
@@ -276,9 +282,36 @@ export async function answerAndRetryAction(applicationId: string, formData: Form
   revalidatePath(`/applications/${applicationId}`);
 }
 
-export async function saveAnswerAction(key: string, question: string, answer: string) {
-  const { profile } = await currentProfile();
-  await updateAnswers(profile.id, [{ key, question, answer }]);
+async function targetProfileId(profileId?: string) {
+  const { profile, email } = await currentProfile();
+  if (!profileId || profileId === profile.id) return profile.id;
+  const { getProfile } = await import("@/lib/services/profiles");
+  return (await getProfile(profileId, email))?.id ?? profile.id;
+}
+
+export async function saveAnswerAction(key: string, question: string, answer: string, profileId?: string) {
+  const id = await targetProfileId(profileId);
+  await updateAnswers(id, [{ key, question, answer: answer.trim() }]);
+  revalidatePath("/profiles");
+}
+
+/** Add a custom saved answer (any question the owner wants the bot to answer). */
+export async function addCustomAnswerAction(question: string, answer: string, profileId?: string) {
+  const { cleanQuestion, customAnswerKey } = await import("@/lib/profile/answer-catalog");
+  const q = cleanQuestion(question).slice(0, 300);
+  if (!q) return { ok: false as const, error: "Question required" };
+  const id = await targetProfileId(profileId);
+  await updateAnswers(id, [{ key: customAnswerKey(q), question: q, answer: answer.trim() }]);
+  revalidatePath("/profiles");
+  return { ok: true as const };
+}
+
+export async function deleteCustomAnswerAction(key: string, profileId?: string) {
+  const { CATALOG_KEYS } = await import("@/lib/profile/answer-catalog");
+  if (CATALOG_KEYS.has(key)) return;
+  const id = await targetProfileId(profileId);
+  const { deleteAnswer } = await import("@/lib/services/profiles");
+  await deleteAnswer(id, key);
   revalidatePath("/profiles");
 }
 

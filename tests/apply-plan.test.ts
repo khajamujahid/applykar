@@ -33,7 +33,7 @@ document.querySelector("form").addEventListener("submit", (event) => {
 });
 </script>`;
 
-it("fills the owner's name and email and leaves an optional unknown blank", () => {
+it("fills the owner's name, email and saved LinkedIn", () => {
   const plan = planForm(
     [
       { id: "#first_name", label: "First Name*", required: true, kind: "text", options: [] },
@@ -51,6 +51,7 @@ it("fills the owner's name and email and leaves an optional unknown blank", () =
     { id: "#first_name", label: "First Name", value: "Khaja", kind: "text" },
     { id: "#last_name", label: "Last Name", value: "Mujahiddin Mohammed", kind: "text" },
     { id: "#email", label: "Email", value: "khajamujahiddin@gmail.com", kind: "text" },
+    { id: "#linkedin", label: "LinkedIn Profile", value: "https://www.linkedin.com/in/mujahiddin-md-6b21b1390", kind: "text" },
     { id: "#sponsor", label: "Will you now or in the future require sponsorship?", value: "No", kind: "choice" },
   ]);
 });

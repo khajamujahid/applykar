@@ -1,4 +1,5 @@
 import type { AnswerRecord, ProfileInput, Seniority } from "@/lib/domain";
+import { catalogDefaults } from "@/lib/profile/answer-catalog";
 
 export const OWNER_NAME = "Khaja Mujahiddin Mohammed";
 
@@ -78,60 +79,5 @@ export const defaultProfile = (): ProfileInput => ({
   onboardingComplete: false,
 });
 
-export const defaultAnswers = (): AnswerRecord[] => [
-  {
-    key: "work_authorization",
-    question: "Are you authorized to work in the United States?",
-    answer: "Yes. I am a U.S. lawful permanent resident (Green Card holder).",
-  },
-  {
-    key: "sponsorship",
-    question: "Will you now or in the future require visa sponsorship?",
-    answer: "No. I do not need sponsorship now or in the future.",
-  },
-  {
-    key: "willing_to_relocate",
-    question: "Are you willing to relocate?",
-    answer: "Yes. I am open to relocating within the United States.",
-  },
-  {
-    key: "salary_expectation",
-    question: "What compensation are you targeting?",
-    answer: "$95,000–$120,000 base, or corp-to-corp at $65 per hour or higher.",
-  },
-  {
-    key: "employment_type",
-    question: "What engagement type do you want?",
-    answer: "I prefer corp-to-corp (C2C). I skip W-2-only roles.",
-  },
-  {
-    key: "availability",
-    question: "When can you start?",
-    answer: "I am available immediately.",
-  },
-  {
-    key: "work_location",
-    question: "Where can you work?",
-    answer: "United States only.",
-  },
-  {
-    key: "eeo_gender",
-    question: "Gender (EEO)",
-    answer: "Prefer not to say",
-  },
-  {
-    key: "eeo_race",
-    question: "Race or ethnicity (EEO)",
-    answer: "Prefer not to say",
-  },
-  {
-    key: "eeo_veteran",
-    question: "Veteran status (EEO)",
-    answer: "Prefer not to say",
-  },
-  {
-    key: "eeo_disability",
-    question: "Disability status (EEO)",
-    answer: "Prefer not to say",
-  },
-];
+/** The full saved-answer set (every common application question). Source of truth: lib/profile/answer-catalog.ts. */
+export const defaultAnswers = (): AnswerRecord[] => catalogDefaults();

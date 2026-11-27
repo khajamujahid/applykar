@@ -16,7 +16,7 @@ const NAV = [
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
-export function SettingsScreen({ email, settings, mcp, ai }: { email: string; settings: Settings; mcp: { url: string; token: string | null }; ai: { configured: boolean; model: string } }) {
+export function SettingsScreen({ email, settings, mcp, ai, answers }: { email: string; settings: Settings; mcp: { url: string; token: string | null }; ai: { configured: boolean; model: string }; answers?: { total: number; blank: number } }) {
   const [s, setS] = useState(settings);
   const [, start] = useTransition();
   const [section, setSection] = useState("auto-apply");
@@ -49,6 +49,13 @@ export function SettingsScreen({ email, settings, mcp, ai }: { email: string; se
       </aside>
       <div className="scroll-thin min-w-0 flex-1 overflow-y-auto px-6 py-5">
         <div className="mx-auto max-w-[620px] space-y-4">
+          {answers ? (
+            <Card id="saved-answers" title="Application questions">
+              <Row label={`${answers.total} saved answers`} hint={answers.blank ? `${answers.blank} still need an answer. The bot copies these into Workday, iCIMS, Greenhouse, Lever and Ashby forms.` : "Every saved question has an answer. The bot copies these into every application form."}>
+                <a href="/profiles#saved-answers" className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-[12.5px] font-medium text-white">Edit answers</a>
+              </Row>
+            </Card>
+          ) : null}
           <Card id="auto-apply" title="Auto-apply">
             <Row label="Background auto-apply" hint="When on, Applykar submits applications. When off, it fills each form and stops before submit.">
               <OnOff checked={s.autoApply} onChange={(v) => save({ autoApply: v })} />
