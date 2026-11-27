@@ -152,8 +152,9 @@ export function matchAnswerKey(label: string, answers: AnswerRecord[] = []): str
   const custom = answers.filter((a) => !CATALOG_KEYS.has(a.key));
   const norm = (s: string) => cleanQuestion(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const exact = custom.find((a) => norm(a.question) === norm(text) || a.key === customAnswerKey(text));
-  if (exact) return exact.key;
   const entry = MATCH_ORDER.find((e) => e.match.test(text));
+  // A blank custom question saved before the catalog covered it must not hide the catalog answer.
+  if (exact && (exact.answer.trim() || !entry)) return exact.key;
   if (entry) return entry.key;
   let best: { key: string; score: number } | null = null;
   for (const a of custom) {

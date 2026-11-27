@@ -108,3 +108,17 @@ describe("secrets and explicit keys", () => {
     expect(matchAnswerKey("Workday account password (saved answer ats_password)")).toBe("ats_password");
   });
 });
+
+describe("stale blank custom questions", () => {
+  it("lets the catalog answer win over a blank custom copy of the same question", () => {
+    const answers = [
+      { key: "based_in_us", question: "Are you currently based in the United States?", answer: "Yes" },
+      { key: "q_are_you_currently_based_in_the_united_states", question: "Are you currently based in the United States?", answer: "" },
+    ];
+    expect(matchAnswerKey("Are you currently based in the United States?", answers)).toBe("based_in_us");
+  });
+  it("keeps a filled custom answer ahead of the catalog", () => {
+    const answers = [{ key: "q_x", question: "Are you currently based in the United States?", answer: "No" }];
+    expect(matchAnswerKey("Are you currently based in the United States?", answers)).toBe("q_x");
+  });
+});

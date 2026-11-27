@@ -4,7 +4,7 @@ import { getDb } from "@/lib/db/client";
 import { ownerSettings, profiles, standardAnswers } from "@/lib/db/schema";
 import { applicationAddress } from "@/lib/inbox/extract";
 import { defaultAnswers, defaultProfile, maxProfiles } from "@/lib/profile/defaults";
-import { CATALOG_KEYS, cleanQuestion, customAnswerKey, matchAnswerKey } from "@/lib/profile/answer-catalog";
+import { ANSWER_CATALOG, CATALOG_KEYS, cleanQuestion, customAnswerKey, matchAnswerKey } from "@/lib/profile/answer-catalog";
 
 function asSeniority(values: string[]): Seniority[] {
   return values.filter((value): value is Seniority => (SENIORITIES as readonly string[]).includes(value));
@@ -71,6 +71,12 @@ export async function mergeDefaultAnswers(profileId: string, existing?: { key: s
   const add = defaultAnswers().filter((d) => !have.has(d.key));
   const fill = defaultAnswers().filter((d) => have.has(d.key) && !(have.get(d.key) ?? "").trim() && d.answer.trim());
   if (add.length) await insertAnswers(profileId, add);
+  // Drop blank custom questions that a (newer) catalog entry now answers, so Profiles shows no duplicates.
+  const all = await getDb().select({ key: standardAnswers.key, question: standardAnswers.question, answer: standardAnswers.answer }).from(standardAnswers).where(eq(standardAnswers.profileId, profileId));
+  for (const row of all) {
+    if (CATALOG_KEYS.has(row.key) || row.answer.trim()) continue;
+    if (ANSWER_CATALOG.some((e) => e.match.test(cleanQuestion(row.question)))) await deleteAnswer(profileId, row.key);
+  }
   for (const d of fill) {
     await getDb()
       .update(standardAnswers)
