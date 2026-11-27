@@ -6,6 +6,7 @@ import { handleMcpRequest } from "@/lib/mcp/handler";
 import greenhouse from "./fixtures/greenhouse.json";
 
 beforeAll(async () => {
+  process.env.MCP_BEARER_TOKEN ||= "applykar-test-token";
   const url = process.env.DATABASE_URL ?? "";
   if (!url.includes("applykar_test")) throw new Error("Refusing to migrate a non-test database");
   await applyMigrations(url);
@@ -43,7 +44,9 @@ it("ingests a recorded board and drives the active profile", async () => {
   global.fetch = (async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("boards-api.greenhouse.io")) {
-      return new Response(JSON.stringify(greenhouse), { status: 200, headers: { "content-type": "application/json" } });
+      // The feed keeps 7 days of postings: make the recorded job fresh.
+      const fresh = { ...greenhouse, jobs: greenhouse.jobs.map((job) => ({ ...job, first_published: new Date(Date.now() - 3_600_000).toISOString(), updated_at: new Date().toISOString() })) };
+      return new Response(JSON.stringify(fresh), { status: 200, headers: { "content-type": "application/json" } });
     }
     return new Response("missing", { status: 404 });
   }) as typeof fetch;
