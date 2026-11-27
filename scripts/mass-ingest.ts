@@ -17,6 +17,7 @@ import { NotFoundError } from "../lib/sources/http";
 import { enrichJob } from "../lib/enrich/rules";
 import { dedupeKey } from "../lib/dedupe";
 import { sha256 } from "../lib/secret";
+import { extractBoards } from "../lib/discovery/extract";
 
 config({ path: ".env.local" });
 config({ path: ".env" });
@@ -29,6 +30,9 @@ const STORAGE_BUDGET_MB = Number(process.env.INGEST_STORAGE_BUDGET_MB || 760);
 const STALE_PRUNE_DAYS = Number(process.env.INGEST_STALE_PRUNE_DAYS || 3);
 const started = Date.now();
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 6 });
+
+/** Boards on other ATS that postings link to (e.g. "apply at jobs.lever.co/acme"); handed to the daily discovery job. */
+const linkedBoards = new Map<string, { source: string; slug: string }>();
 
 type Company = { id: string; name: string; slug: string; source: BoardSource; first_sync?: boolean };
 
@@ -76,6 +80,9 @@ async function upsert(company: Company, normalized: NormalizedJob[]): Promise<{ 
   const rows = [];
   const seen = new Set<string>();
   for (const job of normalized) {
+    if (linkedBoards.size < 50_000)
+      for (const ref of extractBoards(`${job.applyUrl ?? ""} ${job.descriptionText.slice(0, 50_000)}`))
+        if (ref.source !== company.source || ref.slug.toLowerCase() !== company.slug.toLowerCase()) linkedBoards.set(`${ref.source}\t${ref.slug.toLowerCase()}`, ref);
     const description = job.descriptionText.slice(0, 20_000);
     const enriched = enrichJob({
       title: job.title,
@@ -172,9 +179,12 @@ async function claim(limit: number, coldAllowed = true): Promise<Company[]> {
        ORDER BY last_synced_at
        LIMIT $1 FOR UPDATE SKIP LOCKED)
      RETURNING id, name, slug, source, (open_jobs IS NULL) AS first_sync`,
-    [limit, BOARD_SOURCES, String(HOT_MINUTES)],
+    // a quarter of every batch goes to never-synced / least-recently-synced boards, so newly discovered boards
+    // start polling within the hour even when the hot tier alone could fill the run
+    [coldAllowed ? Math.ceil(limit * 0.75) : limit, BOARD_SOURCES, String(HOT_MINUTES)],
   );
-  if (hot.rows.length || !coldAllowed) return hot.rows;
+  if (!coldAllowed) return hot.rows;
+  limit -= hot.rows.length;
   const { rows } = await pool.query<Company>(
     `UPDATE companies SET last_synced_at = now()
      WHERE id IN (
@@ -185,7 +195,7 @@ async function claim(limit: number, coldAllowed = true): Promise<Company[]> {
      RETURNING id, name, slug, source, (open_jobs IS NULL) AS first_sync`,
     [limit, BOARD_SOURCES],
   );
-  return rows;
+  return [...hot.rows, ...rows];
 }
 
 async function processCompany(company: Company, stats: Record<string, number>) {
@@ -268,6 +278,18 @@ async function main() {
       }),
     );
     console.log(`progress ok=${stats.ok} failed=${stats.failed} usJobs=${stats.us} new=${stats.added} t=${Math.round((Date.now() - started) / 1000)}s`);
+  }
+  if (linkedBoards.size) {
+    const result = await pool
+      .query(
+        `INSERT INTO board_discovery (source, slug, via)
+         SELECT x.source::job_source, x.slug, 'postings' FROM json_to_recordset($1::json) AS x(source text, slug text)
+         WHERE NOT EXISTS (SELECT 1 FROM companies c WHERE c.source::text = x.source AND lower(c.slug) = lower(x.slug))
+         ON CONFLICT (source, slug) DO NOTHING`,
+        [JSON.stringify([...linkedBoards.values()])],
+      )
+      .catch((error: unknown) => (console.log("linked boards not queued:", String(error).slice(0, 200)), null));
+    console.log(`linked boards seen=${linkedBoards.size} queued=${result?.rowCount ?? 0}`);
   }
   const mb = await maintain();
   await pool.query("VACUUM (ANALYZE) jobs").catch(() => undefined);

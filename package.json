@@ -14,6 +14,7 @@
     "db:seed": "tsx scripts/seed.ts",
     "ingest": "tsx scripts/ingest.ts",
     "ingest:mass": "tsx scripts/mass-ingest.ts",
+    "discover": "tsx scripts/discover.ts",
     "apply:worker": "tsx scripts/apply-worker.ts",
     "extension:zip": "tsx scripts/pack-extension.ts"
   },

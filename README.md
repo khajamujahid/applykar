@@ -121,3 +121,10 @@ pnpm test:e2e
 - **Mail:** Settings → Connect Gmail (read-only). While a form waits for a code/link the worker calls `POST /api/worker/inbox-sync`
   (Bearer `WORKER_SECRET`) to pull fresh mail, then reads the code/link from the inbox table.
 - **MCP:** `POST /api/mcp` with `Authorization: Bearer <MCP_BEARER_TOKEN>` (token shown in Settings to the signed-in owner).
+  - `discover.yml` daily at 06:40 UTC (01:40 ET) — `pnpm discover`: finds boards that aren't in `companies` yet and adds the
+    ones that answer on the ATS's public API (new boards are polled by the next hourly ingest). Paths: board links inside
+    ingested postings, public board lists on GitHub (curated + repository/code search, re-read when they change), the
+    Common Crawl URL index (newest crawl + two older ones in rotation), Workable's public US job search (companies hiring
+    now), and every known company name tried as a slug on the other ATS (~200k checks/day, rotating). Rejects are
+    remembered for 30 days; each run is logged in `discovery_runs` and in the Actions run summary. It stops adding boards
+    if the database is above 900 MB; the ingest's 760 MB jobs guard is unchanged.
