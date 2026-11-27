@@ -1,13 +1,15 @@
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "@/lib/db/schema";
+import { e2ePreview } from "@/lib/e2e";
 
 type Database = NodePgDatabase<typeof schema>;
 
 const globalForDb = globalThis as unknown as { applykarPool?: Pool };
 
 export function getPool(): Pool {
-  const connectionString = process.env.DATABASE_URL;
+  // e2e previews run against a throwaway Neon branch, never the production database.
+  const connectionString = (e2ePreview() && process.env.E2E_DATABASE_URL) || process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL is not set");
   if (!globalForDb.applykarPool) {
     if (process.env.DB_WS === "1") {
