@@ -114,7 +114,9 @@ pnpm test:e2e
   - `ingest.yml` hourly at :05 — `pnpm ingest:mass`: re-polls every US-hiring board older than 50 min first (freshness), then the long tail
     of `data/boards.tsv.gz` (~73k public ATS boards: Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Workday, iCIMS, Recruitee,
     BambooHR, Breezy, Rippling, JazzHR). US jobs only, 500-char snippets, closed jobs marked stale and pruned after 3 days, dedupe, vacuum,
-    storage guard (760 MB on Neon's 1 GB free branch: compacts, then refreshes hiring boards only).
+    storage guard for Neon's 1 GB free branch: at most 600k live job rows (and 950 MB on disk), jobs posted more than
+    60 days ago are not stored; over budget it compacts, tightens retention step by step to 21 days, then refreshes hiring
+    boards only. A quarter of every batch goes to never-synced boards so new discoveries start polling within the hour.
   - `apply-worker.yml` at :12 and :24 (inside the ingest window so Neon is already awake) — processes the Apply-20 queue with Playwright.
     Never guesses: required questions without a saved answer are flagged, not submitted.
   - `smoke.yml` — signed-in smoke test against a Neon test branch (needs a `SMOKE_DATABASE_URL` secret).
@@ -127,4 +129,4 @@ pnpm test:e2e
     Common Crawl URL index (newest crawl + two older ones in rotation), Workable's public US job search (companies hiring
     now), and every known company name tried as a slug on the other ATS (~200k checks/day, rotating). Rejects are
     remembered for 30 days; each run is logged in `discovery_runs` and in the Actions run summary. It stops adding boards
-    if the database is above 900 MB; the ingest's 760 MB jobs guard is unchanged.
+    if the database is above 900 MB; the ingest's job-row guard (above) is unchanged.

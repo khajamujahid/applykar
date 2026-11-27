@@ -26,7 +26,12 @@ process.env.SR_DETAILS ??= "0";
 const MAX_MINUTES = Number(process.env.INGEST_MAX_MINUTES || 40);
 const CONCURRENCY = Number(process.env.INGEST_CONCURRENCY || 24);
 const DESC_CHARS = Number(process.env.INGEST_DESC_CHARS || 500);
-const STORAGE_BUDGET_MB = Number(process.env.INGEST_STORAGE_BUDGET_MB || 760);
+// Storage guard (Neon free branch = 1 GB). Deleted rows free space for reuse but never shrink the file, so the budget is
+// counted in live job rows; the physical size is only an emergency brake.
+const MAX_JOBS = Number(process.env.INGEST_MAX_JOBS || 600_000);
+const HARD_MB = Number(process.env.INGEST_HARD_MB || 950);
+const RETAIN_DAYS = Number(process.env.INGEST_RETAIN_DAYS || 60);
+let retainDays = RETAIN_DAYS; // tightened (down to 21 days) when the row budget is still exceeded after compaction
 const STALE_PRUNE_DAYS = Number(process.env.INGEST_STALE_PRUNE_DAYS || 3);
 const started = Date.now();
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 6 });
@@ -95,6 +100,7 @@ async function upsert(company: Company, normalized: NormalizedJob[]): Promise<{ 
       salary: job.salary,
     });
     if (!keepUs(job, enriched.usScope, enriched.workplace)) continue;
+    if (job.postedAt && Date.now() - job.postedAt.getTime() > retainDays * 86_400_000) continue; // too old to keep
     const externalId = `${company.slug}:${job.externalId}`;
     if (seen.has(externalId)) continue;
     seen.add(externalId);
@@ -216,6 +222,11 @@ async function processCompany(company: Company, stats: Record<string, number>) {
   }
 }
 
+async function liveJobs(): Promise<number> {
+  const { rows } = await pool.query<{ n: string }>("SELECT n_live_tup AS n FROM pg_stat_user_tables WHERE relname = 'jobs'");
+  return Number(rows[0]?.n ?? 0);
+}
+
 async function maintain(force = false) {
   await pool.query(`DELETE FROM jobs j WHERE stale_at < now() - ($1 || ' days')::interval
     AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.job_id = j.id)
@@ -228,14 +239,14 @@ async function maintain(force = false) {
     FROM ranked r WHERE r.id = j.id AND j.duplicate_of IS DISTINCT FROM NULLIF(r.keep, j.id)`);
   const { rows } = await pool.query<{ mb: string }>("SELECT pg_database_size(current_database()) / 1048576 AS mb");
   const mb = Number(rows[0].mb);
-  if (force || mb > STORAGE_BUDGET_MB) {
-    console.log(`storage ${mb}MB over budget, compacting`);
+  if (force || (await liveJobs()) > MAX_JOBS || mb > HARD_MB) {
+    console.log(`storage: ${mb}MB on disk, compacting to jobs posted within ${retainDays} days`);
     // Deletes only: an UPDATE would write new row versions and grow the database before vacuum.
-    await pool.query(`DELETE FROM jobs j WHERE (stale_at IS NOT NULL OR posted_at < now() - interval '60 days')
+    await pool.query(`DELETE FROM jobs j WHERE (stale_at IS NOT NULL OR posted_at < now() - ($1 || ' days')::interval)
       AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.job_id = j.id)
       AND NOT EXISTS (SELECT 1 FROM job_states s WHERE s.job_id = j.id)
-      AND NOT EXISTS (SELECT 1 FROM bulk_items b WHERE b.job_id = j.id)`);
-    await pool.query("VACUUM jobs").catch(() => undefined);
+      AND NOT EXISTS (SELECT 1 FROM bulk_items b WHERE b.job_id = j.id)`, [String(retainDays)]);
+    await pool.query("VACUUM (ANALYZE) jobs").catch(() => undefined);
   }
   return mb;
 }
@@ -255,11 +266,16 @@ async function main() {
   while (Date.now() - started < budgetMs) {
     if (++checks % 5 === 1) {
       const size = await pool.query<{ mb: string }>("SELECT pg_database_size(current_database()) / 1048576 AS mb");
-      if (Number(size.rows[0].mb) > STORAGE_BUDGET_MB) {
+      const live = await liveJobs();
+      if (live > MAX_JOBS || Number(size.rows[0].mb) > HARD_MB) {
         if (!compacted) {
-          console.log(`storage ${size.rows[0].mb}MB over budget; compacting`);
+          console.log(`storage: ${live} live jobs / ${size.rows[0].mb}MB over budget; compacting`);
           await maintain(true);
           compacted = true;
+        } else if (retainDays > 21) {
+          retainDays = Math.max(21, retainDays - 15);
+          console.log(`still over budget; keeping only jobs posted within ${retainDays} days`);
+          await maintain(true);
         } else if (coldAllowed) {
           console.log("still over budget; refreshing hiring boards only (no new boards this run)");
           coldAllowed = false;
