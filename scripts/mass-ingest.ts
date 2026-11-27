@@ -258,6 +258,11 @@ async function maintain(force = false) {
   return mb;
 }
 
+process.on("beforeExit", (code) => {
+  if (!finished) console.log(`ingest exited before finishing (code ${code}); a request never settled`);
+});
+let finished = false;
+
 async function main() {
   if (!process.env.DATABASE_URL) {
     console.log("DATABASE_URL is not set; skipping.");
@@ -296,7 +301,19 @@ async function main() {
       Array.from({ length: CONCURRENCY }, async () => {
         while (index < batch.length && Date.now() - started < budgetMs + 120_000) {
           const company = batch[index++];
-          await processCompany(company, stats);
+          // Hard per-board deadline: a socket that dies without an error event would otherwise leave a promise that
+          // never settles, and Node exits silently (code 0) once nothing else keeps the event loop alive.
+          let timer: NodeJS.Timeout | undefined;
+          await Promise.race([
+            processCompany(company, stats),
+            new Promise<void>((resolve) => {
+              timer = setTimeout(() => {
+                stats.failed++;
+                resolve();
+              }, 120_000);
+            }),
+          ]);
+          clearTimeout(timer);
         }
       }),
     );
@@ -324,6 +341,7 @@ async function main() {
             (SELECT count(*) FROM jobs WHERE stale_at IS NULL AND duplicate_of IS NULL) AS active_jobs`,
   );
   console.log(JSON.stringify({ ...stats, dbMb: mb, ...rows[0] }));
+  finished = true;
   await pool.end();
 }
 

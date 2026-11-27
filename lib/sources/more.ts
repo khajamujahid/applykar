@@ -19,6 +19,8 @@ function postJson(url: string, body: unknown, attempt = 0): Promise<unknown> {
       (res) => {
         const chunks: Buffer[] = [];
         res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("error", reject);
+        res.on("aborted", () => reject(new Error("Response aborted")));
         res.on("end", () => {
           const status = res.statusCode ?? 0;
           if (status === 404) return reject(new NotFoundError());
