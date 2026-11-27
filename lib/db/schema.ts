@@ -8,11 +8,18 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  serial,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+
+export const bytea = customType<{ data: Buffer | null; driverData: Buffer | null }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 export const vector = customType<{ data: number[] | null; driverData: string | null }>({
   dataType() {
@@ -71,6 +78,10 @@ export const applicationStatus = pgEnum("application_status", [
   "applied",
   "interview",
   "rejected",
+  "applying",
+  "needs_info",
+  "failed",
+  "withdrawn",
 ]);
 
 const timestamps = {
@@ -176,6 +187,9 @@ export const profiles = pgTable("profiles", {
   includeLeadership: boolean("include_leadership").notNull().default(false),
   resumeFilename: text("resume_filename"),
   resumeText: text("resume_text").notNull().default(""),
+  resumeData: jsonb("resume_data"),
+  resumeFile: bytea("resume_file"),
+  resumeMime: text("resume_mime"),
   applicationEmail: text("application_email"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   embedding: vector("embedding"),
@@ -187,6 +201,12 @@ export const ownerSettings = pgTable("owner_settings", {
   id: text("id").primaryKey().default("owner"),
   email: text("email"),
   activeProfileId: uuid("active_profile_id").references(() => profiles.id, { onDelete: "set null" }),
+  autoApply: boolean("auto_apply").notNull().default(false),
+  dailyLimit: integer("daily_limit").notNull().default(50),
+  batchSize: integer("batch_size").notNull().default(20),
+  sevenDaysOnly: boolean("seven_days_only").notNull().default(true),
+  skipW2Only: boolean("skip_w2_only").notNull().default(true),
+  notifyEmail: boolean("notify_email").notNull().default(true),
   updatedAt: timestamps.updatedAt,
 });
 
@@ -238,6 +258,11 @@ export const applications = pgTable(
     whyThisRole: text("why_this_role"),
     notes: text("notes"),
     appliedAt: timestamp("applied_at", { withTimezone: true, mode: "date" }),
+    events: jsonb("events").notNull().default(sql`'[]'::jsonb`),
+    answers: jsonb("answers").notNull().default(sql`'[]'::jsonb`),
+    missing: text("missing").array().notNull().default(sql`'{}'::text[]`),
+    proofPng: bytea("proof_png"),
+    jobSnapshot: jsonb("job_snapshot"),
     createdAt: timestamps.createdAt,
     updatedAt: timestamps.updatedAt,
   },
@@ -314,7 +339,34 @@ export const mailConnections = pgTable("mail_connections", {
   imapUser: text("imap_user"),
   imapPassword: text("imap_password"),
   imapTls: boolean("imap_tls").notNull().default(true),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true, mode: "date" }),
+  codesRead: integer("codes_read").notNull().default(0),
+  createdAt: timestamps.createdAt,
   updatedAt: timestamps.updatedAt,
+});
+
+export const tailoredResumes = pgTable("tailored_resumes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  profileId: uuid("profile_id")
+    .notNull()
+    .references(() => profiles.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id").references(() => jobs.id, { onDelete: "set null" }),
+  applicationId: uuid("application_id").references(() => applications.id, { onDelete: "cascade" }),
+  data: jsonb("data").notNull(),
+  changes: jsonb("changes").notNull().default(sql`'[]'::jsonb`),
+  keywords: text("keywords").array().notNull().default(sql`'{}'::text[]`),
+  matchScore: integer("match_score"),
+  engine: text("engine").notNull().default("rules"),
+  pdf: bytea("pdf"),
+  createdAt: timestamps.createdAt,
+});
+
+export const aiMessages = pgTable("ai_messages", {
+  id: serial("id").primaryKey(),
+  profileId: uuid("profile_id").references(() => profiles.id, { onDelete: "cascade" }),
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamps.createdAt,
 });
 
 export const filterPresets = pgTable("filter_presets", {
@@ -345,4 +397,12 @@ export const ingestRuns = pgTable("ingest_runs", {
   error: text("error"),
   startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   finishedAt: timestamp("finished_at", { withTimezone: true, mode: "date" }),
+});
+
+export const jobDetails = pgTable("job_details", {
+  jobId: uuid("job_id")
+    .primaryKey()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 });

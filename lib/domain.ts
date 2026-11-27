@@ -54,6 +54,10 @@ export const APPLICATION_STATUSES = [
   "applied",
   "interview",
   "rejected",
+  "applying",
+  "needs_info",
+  "failed",
+  "withdrawn",
 ] as const;
 
 export const SALARY_INTERVALS = ["year", "hour"] as const;

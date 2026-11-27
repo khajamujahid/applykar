@@ -8,10 +8,14 @@ import { getAnswers, getProfile } from "@/lib/services/profiles";
 
 const RANK: Record<ApplicationStatus, number> = {
   queued: 0,
+  failed: 0,
+  needs_info: 1,
+  applying: 1,
   ready_for_review: 1,
   applied: 2,
   interview: 3,
   rejected: 4,
+  withdrawn: 4,
 };
 
 export type ApplicationListItem = {

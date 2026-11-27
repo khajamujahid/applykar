@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pg", "unpdf", "pdfjs-dist", "mammoth"],
+  serverExternalPackages: ["pg", "unpdf", "pdfjs-dist", "mammoth", "playwright-core", "@sparticuz/chromium"],
   turbopack: {
     rules: {
       "*.css": {
