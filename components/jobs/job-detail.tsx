@@ -58,7 +58,7 @@ export function JobDetail({ jobId, initial, status, onClose, onApply }: { jobId:
           {job.yoeMin != null ? <span>{job.yoeMin}+ yrs</span> : null}
           {job.yoeMin != null ? <span>·</span> : null}
           <span>{JOB_TYPE_LABEL[job.jobType]}</span>
-          {job.postedAt ? <span>· posted {timeAgo(job.postedAt)}</span> : null}
+          {job.postedAt ? <span suppressHydrationWarning>· posted {timeAgo(job.postedAt)}</span> : null}
           {job.isNew ? <Tag tone="green">New</Tag> : null}
         </div>
         <a href={link} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1 text-[13px] font-medium text-[#2f2496] underline underline-offset-2">

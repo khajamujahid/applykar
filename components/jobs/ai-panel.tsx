@@ -1,5 +1,6 @@
 "use client";
 
+import { clockTime } from "@/lib/time";
 import { useEffect, useRef, useState } from "react";
 import { CheckCheck, Loader2, MoreHorizontal, SendHorizontal, Sparkles } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,7 +10,7 @@ export type ChatMessageView = { role: string; content: string; createdAt: string
 const CHIPS = ["Find Python jobs", "Apply to top 20", "Best match jobs", "Show me remote only"];
 
 function clock(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return clockTime(iso);
 }
 
 export function AiPanel({
@@ -84,7 +85,7 @@ export function AiPanel({
           <div className="grid size-11 shrink-0 place-items-center rounded-full bg-[#efeafe] text-[20px]">🤖</div>
           <p className="text-[13px] font-medium leading-snug">
             Hi {firstName},<br />
-            {newCount.toLocaleString()} new jobs match
+            {newCount.toLocaleString("en-US")} new jobs match
             <br />
             you today
           </p>

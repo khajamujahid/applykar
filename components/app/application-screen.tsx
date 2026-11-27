@@ -8,6 +8,7 @@ import { answerAndRetryAction, markInterviewAction, tailorNowAction, withdrawAct
 import { CompanyLogo, StatusPill } from "@/components/app/bits";
 import type { ApplicationStatus } from "@/lib/domain";
 import type { TailoringChange } from "@/lib/resume/types";
+import { clockTime, dateTime, dayKey, shortDate } from "@/lib/time";
 
 const FIT = `<style>html{background:#f6f6f9}body{margin:8px 0!important}</style><script>(function(){function f(){var w=document.documentElement.clientWidth;document.body.style.zoom=String(Math.min(1,(w-16)/816))}addEventListener("resize",f);f()})()</script>`;
 
@@ -44,10 +45,10 @@ const TABS = [
 function when(iso: string) {
   const d = new Date(iso);
   const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
-  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  if (days === 0 && new Date().getDate() === d.getDate()) return `today ${time}`;
+  const time = clockTime(d);
+  if (days === 0 && dayKey(new Date()) === dayKey(d)) return `today ${time}`;
   if (days <= 1) return `yesterday ${time}`;
-  return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+  return `${shortDate(d)} ${time}`;
 }
 
 export function ApplicationScreen({
@@ -217,7 +218,7 @@ export function ApplicationScreen({
                   <li key={i} className="relative text-[13px]">
                     <span className="absolute -left-[21px] top-1.5 size-2.5 rounded-full bg-primary" />
                     <p>{e.text}</p>
-                    <p className="text-[11.5px] text-muted-foreground">{new Date(e.at).toLocaleString()}</p>
+                    <p className="text-[11.5px] text-muted-foreground">{dateTime(e.at)}</p>
                   </li>
                 ))}
               </ol>

@@ -160,8 +160,8 @@ export function JobsView({
             {pending ? <Loader2 className="size-4 animate-spin text-primary" /> : null}
           </div>
           <p className="text-[13px] text-muted-foreground">
-            <span className="font-semibold text-foreground">Jobs</span> · {total.toLocaleString()} results ·{" "}
-            <span className="font-medium text-primary">{newSinceVisit.toLocaleString()} new since last visit</span>
+            <span className="font-semibold text-foreground">Jobs</span> · {total.toLocaleString("en-US")} results ·{" "}
+            <span className="font-medium text-primary">{newSinceVisit.toLocaleString("en-US")} new since last visit</span>
           </p>
         </div>
         <div ref={listRef} className="scroll-thin min-h-0 flex-1 space-y-2.5 overflow-y-auto px-5 py-4">
@@ -279,7 +279,7 @@ function JobCard({
           {job.isNew ? <Tag tone="green">New</Tag> : null}
           {job.yoeMin != null ? <Tag>{job.yoeMin}+ yrs</Tag> : null}
           <Tag>{JOB_TYPE_LABEL[job.jobType]}</Tag>
-          {job.postedAt ? <span className="ml-2 text-[12px] text-muted-foreground">posted {timeAgo(job.postedAt).replace("Yesterday", "1 day ago")}</span> : null}
+          {job.postedAt ? <span suppressHydrationWarning className="ml-2 text-[12px] text-muted-foreground">posted {timeAgo(job.postedAt).replace("Yesterday", "1 day ago")}</span> : null}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-5">

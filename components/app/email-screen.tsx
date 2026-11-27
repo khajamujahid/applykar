@@ -58,7 +58,7 @@ export function EmailScreen({ connections, activity, notice, googleReady }: { co
             {connections.map((c) => (
               <div key={c.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-4 py-3 text-[13.5px]">
                 <span className="font-semibold">{c.email}</span>
-                <span className="text-[#3f3e55]">
+                <span suppressHydrationWarning className="text-[#3f3e55]">
                   - {c.ok ? "Connected" : "Needs reconnect"} - {c.lastSyncedAt ? `Last synced ${timeAgo(c.lastSyncedAt)}` : "Not synced yet"} - {c.codesRead} codes read
                 </span>
                 <span className="ml-1 rounded bg-muted px-1.5 py-0.5 text-[11px] uppercase text-muted-foreground">{c.provider}</span>
@@ -77,7 +77,7 @@ export function EmailScreen({ connections, activity, notice, googleReady }: { co
                   <span>
                     <span className="font-semibold">{a.source}</span> - {a.text}
                   </span>
-                  <span className="text-[12.5px] text-[#3f3e55]">{timeAgo(a.at)}</span>
+                  <span suppressHydrationWarning className="text-[12.5px] text-[#3f3e55]">{timeAgo(a.at)}</span>
                 </li>
               ))}
             </ul>
