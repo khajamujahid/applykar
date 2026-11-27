@@ -1,9 +1,9 @@
-import { and, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import type { JobFilters, JobSource, ProfileRecord, ScoredJob, Seniority, Workplace } from "@/lib/domain";
 import { formatSalary } from "@/lib/domain";
 import { getDb } from "@/lib/db/client";
 import { applications, jobStates, jobs } from "@/lib/db/schema";
-import { matchesListing } from "@/lib/feed/listing";
+import { jobTypeOf, matchesListing } from "@/lib/feed/listing";
 import { passesHardFilters, scoreJob } from "@/lib/fit/score";
 import { getProfile } from "@/lib/services/profiles";
 
@@ -94,6 +94,8 @@ function toScored(row: JobRow, profile: ProfileRecord, withDescription: boolean)
     applicationId: row.applicationId,
     applicationStatus: row.applicationStatus,
     description: withDescription ? (row.descriptionText ?? "") : null,
+    jobType: jobTypeOf(row.title, row.descriptionText ?? ""),
+    isNew: Date.now() - (row.postedAt ?? row.firstSeenAt ?? new Date(0)).getTime() < 86_400_000,
   };
   const scored = scoreJob(base, profile, row.similarity);
   return { ...base, score: scored.score, scoreNotes: scored.notes, breakdown: scored.breakdown, why: scored.why };
@@ -132,9 +134,17 @@ function selection(profileId: string) {
   };
 }
 
-export async function searchJobs(profileId: string, filters: JobFilters = {}): Promise<{ jobs: ScoredJob[]; total: number }> {
+export type JobSearchResult = { jobs: ScoredJob[]; total: number; newSinceVisit: number };
+
+/** Hours window for the feed: explicit filter, else the 7-day retention window. */
+function windowHours(filters: JobFilters): number {
+  return filters.postedWithinHours ?? (filters.postedWithinDays ? filters.postedWithinDays * 24 : 168);
+}
+
+export async function searchJobs(profileId: string, filters: JobFilters = {}, options: { since?: Date | null; sinceFallbackHours?: number } = {}): Promise<JobSearchResult> {
+  const seenSince = options.since ?? (options.sinceFallbackHours ? new Date(Date.now() - options.sinceFallbackHours * 3_600_000) : null);
   const profile = await getProfile(profileId);
-  if (!profile) return { jobs: [], total: 0 };
+  if (!profile) return { jobs: [], total: 0, newSinceVisit: 0 };
   const where = [
     isNull(jobs.staleAt),
     isNull(jobs.duplicateOf),
@@ -142,34 +152,52 @@ export async function searchJobs(profileId: string, filters: JobFilters = {}): P
   ];
   if (filters.savedOnly) where.push(eq(jobStates.saved, true));
   if (filters.q) {
-    const term = `%${filters.q.replace(/[%_]/g, "")}%`;
-    const search = or(ilike(jobs.title, term), ilike(jobs.companyName, term));
+    const clean = filters.q.replace(/[%_]/g, "").trim();
+    const words = clean.split(/\s+/).filter(Boolean).slice(0, 6);
+    const titleAll = and(...words.map((w) => ilike(jobs.title, `%${w}%`)));
+    const search = or(titleAll, ilike(jobs.companyName, `%${clean}%`));
     if (search) where.push(search);
   }
   if (filters.sources?.length) where.push(inArray(jobs.source, filters.sources));
-  if (!filters.includeNonUs) where.push(sql`${jobs.usScope} <> 'non_us'`);
+  if (!(filters.includeNonUs ?? !profile.usaOnly)) where.push(sql`${jobs.usScope} <> 'non_us'`);
+  if (!(filters.includeW2Only ?? !profile.skipW2Only)) where.push(eq(jobs.w2Only, false));
   if (filters.workplace?.length) where.push(inArray(jobs.workplace, filters.workplace));
-  if (filters.postedWithinDays) {
-    const since = new Date(Date.now() - filters.postedWithinDays * 86_400_000);
-    const posted = or(sql`${jobs.postedAt} >= ${since}`, sql`${jobs.postedAt} IS NULL AND ${jobs.firstSeenAt} >= ${since}`);
-    if (posted) where.push(posted);
+  if (filters.yoeMax) where.push(sql`(${jobs.yoeMin} IS NULL OR ${jobs.yoeMin} <= ${filters.yoeMax})`);
+  if (filters.near) {
+    const term = `%${filters.near.replace(/[%_]/g, "")}%`;
+    where.push(sql`(${jobs.locationRaw} ILIKE ${term} OR ${jobs.city} ILIKE ${term} OR ${jobs.region} ILIKE ${term})`);
+  }
+  if (!filters.savedOnly && filters.tab !== "liked" && filters.tab !== "applied") {
+    // Only dated postings inside the window count as "posted" (undated boards are kept but not shown as fresh).
+    const since = new Date(Date.now() - windowHours(filters) * 3_600_000);
+    where.push(sql`${jobs.postedAt} >= ${since}`);
   }
   const tab = filters.tab ?? "recommended";
   if (tab === "liked") where.push(eq(jobStates.saved, true));
   if (tab === "applied") where.push(inArray(applications.status, ["applied", "interview", "rejected"]));
   if (tab === "external") where.push(eq(jobs.source, "captured"));
-  if (tab === "recommended" || tab === "newest") {
-    const open = or(isNull(applications.status), inArray(applications.status, ["queued", "ready_for_review"]));
-    if (open) where.push(open);
-  }
-  const rows = await getDb()
-    .select(selection(profileId))
-    .from(jobs)
-    .leftJoin(jobStates, and(eq(jobStates.jobId, jobs.id), eq(jobStates.profileId, profileId)))
-    .leftJoin(applications, and(eq(applications.jobId, jobs.id), eq(applications.profileId, profileId)))
-    .where(and(...where))
-    .orderBy(sql`${jobs.postedAt} DESC NULLS LAST`)
-    .limit(600);
+  const db = getDb();
+  const base = () =>
+    db
+      .select(selection(profileId))
+      .from(jobs)
+      .leftJoin(jobStates, and(eq(jobStates.jobId, jobs.id), eq(jobStates.profileId, profileId)))
+      .leftJoin(applications, and(eq(applications.jobId, jobs.id), eq(applications.profileId, profileId)));
+  const [rows, counts] = await Promise.all([
+    base()
+      .where(and(...where))
+      .orderBy(sql`${jobs.postedAt} DESC NULLS LAST`)
+      .limit(Math.max(600, (filters.limit ?? 60) * 4)),
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        fresh: seenSince ? sql<number>`count(*) FILTER (WHERE ${jobs.firstSeenAt} > ${seenSince})::int` : sql<number>`0`,
+      })
+      .from(jobs)
+      .leftJoin(jobStates, and(eq(jobStates.jobId, jobs.id), eq(jobStates.profileId, profileId)))
+      .leftJoin(applications, and(eq(applications.jobId, jobs.id), eq(applications.profileId, profileId)))
+      .where(and(...where)),
+  ]);
   const scored = rows
     .map((row) => toScored(row as JobRow, profile, false))
     .filter((job) => (tab === "applied" ? true : passesHardFilters(job, profile, filters) && matchesListing(job, filters)))
@@ -178,7 +206,7 @@ export async function searchJobs(profileId: string, filters: JobFilters = {}): P
         ? (b.postedAt ?? "").localeCompare(a.postedAt ?? "") || b.score - a.score
         : b.score - a.score || (b.postedAt ?? "").localeCompare(a.postedAt ?? ""),
     );
-  return { jobs: scored.slice(0, 80), total: scored.length };
+  return { jobs: scored.slice(0, filters.limit ?? 60), total: Number(counts[0]?.total ?? scored.length), newSinceVisit: Number(counts[0]?.fresh ?? 0) };
 }
 
 export async function getJob(profileId: string, jobId: string): Promise<ScoredJob | null> {
@@ -226,4 +254,20 @@ export async function hideJob(profileId: string, jobId: string, hidden = true): 
 export async function listSaved(profileId: string): Promise<ScoredJob[]> {
   const result = await searchJobs(profileId, { savedOnly: true, includeLeadership: true, includeNonUs: true, includeW2Only: true });
   return result.jobs;
+}
+
+/**
+ * Remember when the Jobs page was last opened. Returns the previous visit (used for "N new since last visit");
+ * visits within 30 minutes of each other count as one.
+ */
+export async function markFeedVisit(profileId: string): Promise<Date | null> {
+  const result = await getDb().execute(sql`
+    UPDATE profiles SET
+      feed_prev_seen_at = CASE WHEN feed_seen_at IS NULL OR feed_seen_at < now() - interval '30 minutes' THEN feed_seen_at ELSE feed_prev_seen_at END,
+      feed_seen_at = now()
+    WHERE id = ${profileId}::uuid
+    RETURNING feed_prev_seen_at`);
+  const rows = ("rows" in result ? result.rows : result) as { feed_prev_seen_at: Date | string | null }[];
+  const value = rows[0]?.feed_prev_seen_at;
+  return value ? new Date(value) : null;
 }

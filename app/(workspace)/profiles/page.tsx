@@ -1,105 +1,51 @@
-import { createProfileAction, saveProfileAction } from "@/app/actions";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { eq } from "drizzle-orm";
+import { ProfilesScreen } from "@/components/app/profiles-screen";
 import { currentProfile } from "@/lib/current";
-import { maxProfiles } from "@/lib/profile/defaults";
+import { getDb } from "@/lib/db/client";
+import { profiles as profilesTable } from "@/lib/db/schema";
+import { OWNER_NAME, maxProfiles } from "@/lib/profile/defaults";
+import type { ResumeData } from "@/lib/resume/types";
 import { getAnswers, listProfiles } from "@/lib/services/profiles";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProfilesPage() {
-  const { email, profile } = await currentProfile();
-  const profiles = await listProfiles(email);
-  const answers = await getAnswers(profile.id);
-
+export default async function ProfilesPage({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
+  const { p } = await searchParams;
+  const { email, profile: active } = await currentProfile();
+  const all = await listProfiles(email);
+  const selected = all.find((x) => x.id === p) ?? active;
+  const [answers, extra] = await Promise.all([
+    getAnswers(selected.id),
+    getDb().select({ resumeData: profilesTable.resumeData }).from(profilesTable).where(eq(profilesTable.id, selected.id)).limit(1),
+  ]);
+  const info = (extra[0]?.resumeData as ResumeData | null)?.personalInformation;
+  const get = (key: string) => answers.find((a) => a.key === key)?.answer ?? "";
+  const personal = {
+    name: get("full_name") || [info?.firstName, info?.lastName].filter(Boolean).join(" ") || OWNER_NAME,
+    email: get("email") || info?.email || email,
+    phone: get("phone") || info?.phone || "",
+    linkedin: get("linkedin") || (info?.linkedinUrl ?? "").replace(/^https?:\/\/(www\.)?/, ""),
+    location: get("location") || [info?.city, info?.state].filter(Boolean).join(", ") || selected.locations.join(", "),
+    remote: get("remote") || (selected.locations.some((l) => /remote/i.test(l)) ? "Yes" : "No"),
+    jobType: get("job_type") || (selected.prefersC2c ? "Contract (C2C), Full-time" : "Full-time"),
+  };
+  const saved = answers.filter((a) => !["full_name", "email", "phone", "linkedin", "location", "remote", "job_type"].includes(a.key) && !a.key.startsWith("eeo_"));
   return (
-    <div className="grid gap-6 px-4 py-4 xl:grid-cols-[220px_minmax(0,1fr)]">
-      <aside>
-        <h1 className="text-base font-medium">Profiles</h1>
-        <p className="mt-1 text-[12px] text-muted-foreground">
-          {profiles.length} of {maxProfiles()}
-        </p>
-        <ul className="mt-3 grid gap-1">
-          {profiles.map((item) => (
-            <li key={item.id} className={item.id === profile.id ? "text-primary" : "text-muted-foreground"}>
-              {item.name}
-            </li>
-          ))}
-        </ul>
-        {profiles.length < maxProfiles() ? (
-          <form
-            className="mt-4 grid gap-2"
-            action={async (formData) => {
-              "use server";
-              await createProfileAction(String(formData.get("name") ?? ""));
-            }}
-          >
-            <Input name="name" placeholder="New profile" />
-            <Button type="submit" size="sm" variant="outline">
-              Add profile
-            </Button>
-          </form>
-        ) : (
-          <p className="mt-3 text-[12px] text-muted-foreground">Profile limit reached.</p>
-        )}
-      </aside>
-      <form action={saveProfileAction} className="grid gap-3">
-        <h2 className="text-sm font-medium">Edit {profile.name}</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Name" name="name" defaultValue={profile.name} />
-          <Field label="Headline" name="headline" defaultValue={profile.headline} />
-          <Field label="Target titles" name="titles" defaultValue={profile.targetTitles.join(", ")} />
-          <Field label="Skills" name="skills" defaultValue={profile.skills.join(", ")} />
-          <Field label="Locations" name="locations" defaultValue={profile.locations.join(", ")} />
-          <Field label="Interests" name="interests" defaultValue={profile.interests.join(", ")} />
-          <Field label="Years of experience" name="years" defaultValue={profile.yearsExperience ? String(profile.yearsExperience) : ""} />
-          <Field label="Hide roles asking for more than" name="yoeMax" defaultValue={profile.yoeMax ? String(profile.yoeMax) : ""} />
-          <Field label="Salary min" name="salaryMin" defaultValue={String(profile.salaryMin)} />
-          <Field label="Salary max" name="salaryMax" defaultValue={String(profile.salaryMax)} />
-          <Field label="C2C hourly minimum" name="c2c" defaultValue={String(profile.c2cMinHourly)} />
-        </div>
-        <label className="text-[13px]">
-          Replace resume
-          <Input className="mt-1" name="resume" type="file" accept=".pdf,.docx,.txt,.md" />
-        </label>
-        <div className="flex flex-wrap gap-3 text-[13px]">
-          <Check name="skipW2" label="Skip W-2 only" defaultChecked={profile.skipW2Only} />
-          <Check name="prefersC2c" label="Prefer C2C" defaultChecked={profile.prefersC2c} />
-          <Check name="usaOnly" label="United States only" defaultChecked={profile.usaOnly} />
-          <Check name="leadership" label="Include leadership" defaultChecked={profile.includeLeadership} />
-          <Check name="relocate" label="Open to relocate" defaultChecked={profile.openToRelocate} />
-        </div>
-        <div className="grid gap-2">
-          {answers.map((answer) => (
-            <label key={answer.key} className="grid gap-1 text-[12px] text-muted-foreground">
-              {answer.question}
-              <Textarea name={`answer:${answer.key}`} defaultValue={answer.answer} />
-            </label>
-          ))}
-        </div>
-        <Button type="submit" className="w-fit">
-          Save profile
-        </Button>
-      </form>
-    </div>
-  );
-}
-
-function Field({ label, name, defaultValue }: { label: string; name: string; defaultValue: string }) {
-  return (
-    <label className="grid gap-1 text-[12px] text-muted-foreground">
-      {label}
-      <Input name={name} defaultValue={defaultValue} />
-    </label>
-  );
-}
-
-function Check({ name, label, defaultChecked }: { name: string; label: string; defaultChecked: boolean }) {
-  return (
-    <label className="flex items-center gap-2">
-      <input type="checkbox" name={name} defaultChecked={defaultChecked} />
-      {label}
-    </label>
+    <ProfilesScreen
+      profiles={all.map((x) => ({ id: x.id, name: x.name, resumeFilename: x.resumeFilename, years: x.yearsExperience, tags: x.targetTitles.slice(0, 3), isDefault: x.id === active.id }))}
+      max={maxProfiles()}
+      selected={{
+        id: selected.id,
+        name: selected.name,
+        titles: selected.targetTitles.join(", "),
+        locations: selected.locations.join(", "),
+        salary: `$${Math.round(selected.salaryMin / 1000)}k–$${Math.round(selected.salaryMax / 1000)}k`,
+        years: selected.yearsExperience,
+        resumeFilename: selected.resumeFilename,
+        structured: Boolean(info),
+      }}
+      personal={personal}
+      answers={saved}
+    />
   );
 }

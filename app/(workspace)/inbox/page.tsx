@@ -1,40 +1,43 @@
+import { desc, eq, or, isNotNull, and } from "drizzle-orm";
+import { EmailScreen } from "@/components/app/email-screen";
 import { currentProfile } from "@/lib/current";
-import { listInbox } from "@/lib/inbox/store";
+import { getDb } from "@/lib/db/client";
+import { inboxMessages } from "@/lib/db/schema";
+import { listConnections } from "@/lib/inbox/connections";
 
 export const dynamic = "force-dynamic";
 
-export default async function InboxPage() {
+export default async function EmailIntegrationPage({ searchParams }: { searchParams: Promise<{ connected?: string; error?: string }> }) {
+  const { connected, error } = await searchParams;
   const { profile } = await currentProfile();
-  const messages = await listInbox(profile.id);
-
+  const [connections, activity] = await Promise.all([
+    listConnections().catch(() => []),
+    getDb()
+      .select({ id: inboxMessages.id, ats: inboxMessages.ats, employer: inboxMessages.employer, code: inboxMessages.verificationCode, link: inboxMessages.verifyUrl, kind: inboxMessages.kind, subject: inboxMessages.subject, at: inboxMessages.receivedAt })
+      .from(inboxMessages)
+      .where(and(eq(inboxMessages.profileId, profile.id), or(isNotNull(inboxMessages.verificationCode), isNotNull(inboxMessages.verifyUrl), eq(inboxMessages.kind, "confirmation"), eq(inboxMessages.kind, "interview"))))
+      .orderBy(desc(inboxMessages.receivedAt))
+      .limit(12)
+      .catch(() => []),
+  ]);
   return (
-    <div className="px-4 py-4" data-testid="inbox">
-      <h1 className="text-base font-medium">Inbox</h1>
-      <p className="mt-1 text-[12px] text-muted-foreground">
-        {profile.applicationEmail ?? "Set INBOX_DOMAIN to give this profile an application address."} Codes, confirmations, interviews, and rejections land here and update the tracker.
-      </p>
-      {messages.length === 0 ? (
-        <p className="py-16 text-center text-muted-foreground">No application mail yet. Connect Gmail or IMAP in Settings.</p>
-      ) : (
-        <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
-          {messages.map((message) => (
-            <li key={message.id} data-testid="inbox-message" className="grid gap-1 px-3 py-3">
-              <p className="font-medium">{message.subject || "(no subject)"}</p>
-              <p className="text-[12px] text-muted-foreground">
-                {message.sender} · {message.ats} · {message.kind}
-                {message.employer ? ` · ${message.employer}` : ""}
-              </p>
-              {message.verificationCode ? <p>Code {message.verificationCode}</p> : null}
-              {message.verifyUrl ? (
-                <a className="truncate text-primary" href={message.verifyUrl}>
-                  {message.verifyUrl}
-                </a>
-              ) : null}
-              {message.applicationId ? <p className="text-[12px]">Matched to an application and saved as proof.</p> : null}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <EmailScreen
+      notice={connected ? `Connected ${connected}` : error ? "Could not connect that inbox" : null}
+      googleReady={Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET)}
+      connections={connections.map((c) => ({
+        id: c.id,
+        provider: c.provider,
+        email: c.email ?? c.imapUser ?? c.id,
+        lastSyncedAt: c.lastSyncedAt?.toISOString() ?? null,
+        codesRead: c.codesRead,
+        ok: c.provider === "gmail" ? Boolean(c.refreshToken) : Boolean(c.imapHost && c.imapUser),
+      }))}
+      activity={activity.map((a) => ({
+        id: a.id,
+        source: a.ats !== "unknown" ? a.ats[0].toUpperCase() + a.ats.slice(1) : a.employer || "Email",
+        text: a.code ? `code ${a.code} read` : a.link ? "email verified link found" : a.kind === "interview" ? "interview email" : "confirmation received",
+        at: a.at.toISOString(),
+      }))}
+    />
   );
 }

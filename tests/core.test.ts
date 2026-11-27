@@ -26,6 +26,8 @@ const profile: ProfileRecord = {
 
 function job(overrides: Partial<ScoredJob> = {}): ScoredJob {
   return {
+    jobType: "full_time",
+    isNew: false,
     id: "job-1",
     title: "Senior Data Analyst",
     companyName: "Northwind",

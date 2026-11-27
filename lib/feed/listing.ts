@@ -1,4 +1,4 @@
-import type { JobFilters, ScoredJob } from "@/lib/domain";
+import type { JobFilters, JobType, ScoredJob } from "@/lib/domain";
 
 const FUNCTIONS: { name: string; pattern: RegExp }[] = [
   { name: "Data", pattern: /data|analytics|analyst|bi\b|warehouse/i },
@@ -44,6 +44,15 @@ const CITIES: Record<string, [number, number]> = {
   remote: [39.8, -98.6],
 };
 
+/** Employment type from the title and description excerpt (most feeds don't send a field for it). */
+export function jobTypeOf(title: string, text = ""): JobType {
+  const blob = `${title} ${text.slice(0, 500)}`;
+  if (/\b(intern|internship|co-?op)\b/i.test(title)) return "internship";
+  if (/\b(contract|contractor|c2c|corp[- ]to[- ]corp|1099|temporary|temp)\b/i.test(blob) && !/full[- ]time/i.test(title)) return "contract";
+  if (/\bpart[- ]time\b/i.test(blob) && !/full[- ]time/i.test(blob)) return "part_time";
+  return "full_time";
+}
+
 export function jobFunction(title: string): string {
   return FUNCTIONS.find((item) => item.pattern.test(title))?.name ?? "Other";
 }
@@ -73,6 +82,7 @@ function miles(from: [number, number], to: [number, number]): number {
 }
 
 export function matchesListing(job: ScoredJob, filters: JobFilters): boolean {
+  if (filters.jobTypes?.length && !filters.jobTypes.includes(job.jobType)) return false;
   if (filters.jobFunction && jobFunction(job.title) !== filters.jobFunction) return false;
   if (filters.title && !job.title.toLowerCase().includes(filters.title.toLowerCase())) return false;
   if (filters.excludeStaffing && isStaffingAgency(job.companyName)) return false;

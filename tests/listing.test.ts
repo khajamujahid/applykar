@@ -4,6 +4,8 @@ import { isStaffingAgency, jobFunction, matchesListing } from "@/lib/feed/listin
 
 function job(overrides: Partial<ScoredJob> = {}): ScoredJob {
   return {
+    jobType: "full_time",
+    isNew: false,
     id: "1",
     title: "Senior Data Analyst",
     companyName: "Stripe",

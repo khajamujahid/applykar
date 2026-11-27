@@ -190,6 +190,8 @@ export const profiles = pgTable("profiles", {
   resumeData: jsonb("resume_data"),
   resumeFile: bytea("resume_file"),
   resumeMime: text("resume_mime"),
+  feedSeenAt: timestamp("feed_seen_at", { withTimezone: true, mode: "date" }),
+  feedPrevSeenAt: timestamp("feed_prev_seen_at", { withTimezone: true, mode: "date" }),
   applicationEmail: text("application_email"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   embedding: vector("embedding"),

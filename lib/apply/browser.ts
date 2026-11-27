@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "playwright";
@@ -27,6 +28,8 @@ export type ApplyRequest = {
 
 export type ApplyResult = {
   status: "applied" | "skipped" | "failed" | "ready";
+  /** Answers that were filled into the form (label -> value). */
+  answers?: { question: string; answer: string }[];
   missing: string[];
   proofNote: string | null;
   screenshotPath: string | null;
@@ -94,8 +97,15 @@ export async function applyOnPage(page: Page, request: ApplyRequest, options?: {
       await control.pressSequentially(answer.value, { delay: 0 });
     }
   }
-  if (plan.resume && request.resumeText.trim()) {
-    const directory = path.join(process.cwd(), "data", "resumes");
+  const filled = plan.answers.map((answer) => ({ question: answer.label, answer: answer.value }));
+  if (plan.resume && request.resumeFilePath) {
+    const file = page.locator("input[type='file']").first();
+    if ((await file.count()) > 0) {
+      await file.setInputFiles(request.resumeFilePath).catch(() => undefined);
+      filled.push({ question: "Resume", answer: path.basename(request.resumeFilePath) });
+    }
+  } else if (plan.resume && request.resumeText.trim()) {
+    const directory = path.join(os.tmpdir(), "applykar", "resumes");
     await mkdir(directory, { recursive: true });
     const filename = request.resumeFilename?.replace(/[^\w.-]+/g, "-") || "resume.txt";
     const resumePath = path.join(directory, filename.endsWith(".txt") || filename.endsWith(".pdf") || filename.endsWith(".docx") ? filename : `${filename}.txt`);
@@ -103,7 +113,7 @@ export async function applyOnPage(page: Page, request: ApplyRequest, options?: {
     const file = page.locator("input[type='file']").first();
     if ((await file.count()) > 0 && resumePath.endsWith(".txt")) await file.setInputFiles(resumePath);
   }
-  const shotDir = path.join(process.cwd(), "data", "proofs");
+  const shotDir = path.join(os.tmpdir(), "applykar", "proofs");
   await mkdir(shotDir, { recursive: true });
   const screenshotPath = path.join(shotDir, `${Date.now()}-${request.source}.png`);
   const formShot = page.locator("form").first();
@@ -117,7 +127,7 @@ export async function applyOnPage(page: Page, request: ApplyRequest, options?: {
     const note = !plan.ready
       ? `Filled known answers. Did not submit. Unanswered: ${plan.missing.join("; ")}`
       : "Form filled from saved answers. Submit is off.";
-    return { status: plan.ready ? "ready" : "skipped", missing: plan.missing, proofNote: note, screenshotPath };
+    return { status: plan.ready ? "ready" : "skipped", missing: plan.missing, proofNote: note, screenshotPath, answers: filled };
   }
   const challengeFrame = page.frames().some((frame) => {
     const url = frame.url();
@@ -164,7 +174,7 @@ export async function applyOnPage(page: Page, request: ApplyRequest, options?: {
   const after = await page.locator("body").innerText();
   await shoot();
   if (/application submitted|thank you for applying|we received your application/i.test(after)) {
-    return { status: "applied", missing: [], proofNote: after.slice(0, 500), screenshotPath };
+    return { status: "applied", missing: [], proofNote: after.slice(0, 500), screenshotPath, answers: filled };
   }
   return { status: "failed", missing: [], proofNote: after.slice(0, 500), screenshotPath, error: "No confirmation appeared after submit." };
 }

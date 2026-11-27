@@ -1,4 +1,4 @@
-import { getGmailConnection } from "@/lib/inbox/connections";
+import { getGmailConnections, markSynced } from "@/lib/inbox/connections";
 import { ingestInboundEmail } from "@/lib/inbox/store";
 
 type GmailPart = { mimeType?: string; body?: { data?: string }; parts?: GmailPart[]; headers?: { name: string; value: string }[] };
@@ -39,12 +39,29 @@ function header(part: GmailPart, name: string): string {
   return part.headers?.find((item) => item.name.toLowerCase() === name)?.value ?? "";
 }
 
+/** Sync every connected Gmail inbox. */
 export async function syncGmail(options: { newerThan?: string; max?: number } = {}): Promise<{ imported: number; skipped?: string }> {
-  const connection = await getGmailConnection();
+  const connections = await getGmailConnections();
+  if (!connections.length) return { imported: 0, skipped: "Gmail is not connected" };
+  let imported = 0;
+  const skipped: string[] = [];
+  for (const connection of connections) {
+    const result = await syncOne(connection, options);
+    imported += result.imported;
+    if (result.skipped) skipped.push(`${connection.email ?? connection.id}: ${result.skipped}`);
+    else await markSynced(connection.id, result.codes);
+  }
+  return { imported, skipped: skipped.join("; ") || undefined };
+}
+
+async function syncOne(
+  connection: { refreshToken: string | null },
+  options: { newerThan?: string; max?: number },
+): Promise<{ imported: number; codes: number; skipped?: string }> {
   const refreshToken = connection?.refreshToken;
   const clientId = process.env.AUTH_GOOGLE_ID;
   const clientSecret = process.env.AUTH_GOOGLE_SECRET;
-  if (!refreshToken || !clientId || !clientSecret) return { imported: 0, skipped: "Gmail is not connected" };
+  if (!refreshToken || !clientId || !clientSecret) return { imported: 0, codes: 0, skipped: "Gmail is not connected" };
 
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -56,9 +73,9 @@ export async function syncGmail(options: { newerThan?: string; max?: number } = 
       grant_type: "refresh_token",
     }),
   });
-  if (!tokenResponse.ok) return { imported: 0, skipped: "Gmail token refresh failed" };
+  if (!tokenResponse.ok) return { imported: 0, codes: 0, skipped: "Gmail token refresh failed" };
   const token = (await tokenResponse.json()) as { access_token?: string };
-  if (!token.access_token) return { imported: 0, skipped: "Gmail token refresh failed" };
+  if (!token.access_token) return { imported: 0, codes: 0, skipped: "Gmail token refresh failed" };
 
   const query = encodeURIComponent(
     `newer_than:${options.newerThan ?? "21d"} (verification OR verify OR code OR passcode OR confirm OR application OR interview OR unfortunately)`,
@@ -66,9 +83,10 @@ export async function syncGmail(options: { newerThan?: string; max?: number } = 
   const listResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${options.max ?? 25}&q=${query}`, {
     headers: { authorization: `Bearer ${token.access_token}` },
   });
-  if (!listResponse.ok) return { imported: 0, skipped: "Gmail list failed" };
+  if (!listResponse.ok) return { imported: 0, codes: 0, skipped: "Gmail list failed" };
   const list = (await listResponse.json()) as { messages?: { id: string }[] };
   let imported = 0;
+  let codes = 0;
   for (const message of list.messages ?? []) {
     const detailResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}?format=full`, {
       headers: { authorization: `Bearer ${token.access_token}` },
@@ -85,7 +103,10 @@ export async function syncGmail(options: { newerThan?: string; max?: number } = 
       text: plainText(payload) || htmlText(payload),
       receivedAt: detail.internalDate ? new Date(Number(detail.internalDate)) : undefined,
     });
-    if (!stored.duplicate) imported += 1;
+    if (!stored.duplicate) {
+      imported += 1;
+      if (stored.verificationCode || stored.verifyUrl) codes += 1;
+    }
   }
-  return { imported };
+  return { imported, codes };
 }

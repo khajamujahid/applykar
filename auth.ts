@@ -30,8 +30,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: { signIn: "/login", error: "/login" },
   trustHost: true,
   callbacks: {
-    signIn({ user, profile }) {
+    async signIn({ user, profile, account }) {
       const email = user.email ?? (typeof profile?.email === "string" ? profile.email : null);
+      if (account?.provider === "gmail") {
+        // Connecting a job inbox: any Gmail account, as long as the owner is already signed in. The owner's session is kept.
+        const current = await auth();
+        const ownerSignedIn = isAllowedEmail(current?.user?.email);
+        if (ownerSignedIn || isAllowedEmail(email)) {
+          if (account.refresh_token) {
+            const { saveGmailConnection } = await import("@/lib/inbox/connections");
+            await saveGmailConnection({
+              email: email ?? null,
+              refreshToken: account.refresh_token,
+              accessToken: account.access_token ?? null,
+              expiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
+            });
+          }
+          if (ownerSignedIn) return `/inbox?connected=${encodeURIComponent(email ?? "gmail")}`;
+          return true;
+        }
+        return false;
+      }
       return isAllowedEmail(email);
     },
     jwt({ token, user }) {
@@ -53,18 +72,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         name: typeof token.name === "string" ? token.name : "Khaja Mujahiddin Mohammed",
       };
       return session;
-    },
-  },
-  events: {
-    async signIn({ account, user }) {
-      if (account?.provider !== "gmail" || !account.refresh_token) return;
-      const { saveGmailConnection } = await import("@/lib/inbox/connections");
-      await saveGmailConnection({
-        email: user.email ?? null,
-        refreshToken: account.refresh_token,
-        accessToken: account.access_token ?? null,
-        expiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
-      });
     },
   },
 });

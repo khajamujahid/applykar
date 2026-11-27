@@ -177,7 +177,13 @@ export type ScoredJob = {
   applicationId: string | null;
   applicationStatus: ApplicationStatus | null;
   description: string | null;
+  jobType: JobType;
+  isNew: boolean;
 };
+
+export const JOB_TYPES = ["full_time", "contract", "part_time", "internship"] as const;
+export type JobType = (typeof JOB_TYPES)[number];
+export const JOB_TYPE_LABEL: Record<JobType, string> = { full_time: "Full-time", contract: "Contract", part_time: "Part-time", internship: "Internship" };
 
 export type JobFilters = {
   q?: string;
@@ -185,6 +191,10 @@ export type JobFilters = {
   seniority?: Seniority[];
   sources?: JobSource[];
   postedWithinDays?: number;
+  /** Posted within the last N hours (1, 3, 5, 24, 72, 168). Overrides postedWithinDays. */
+  postedWithinHours?: number;
+  jobTypes?: JobType[];
+  limit?: number;
   c2cOnly?: boolean;
   hasSalary?: boolean;
   yoeMax?: number;

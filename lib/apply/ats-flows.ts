@@ -1,3 +1,4 @@
+import os from "node:os";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import type { Locator, Page } from "playwright";
@@ -5,7 +6,7 @@ import { planForm, savedValue, type FormQuestion } from "@/lib/apply/plan";
 import type { ApplyRequest, ApplyResult } from "@/lib/apply/browser";
 
 async function shot(page: Page, source: string): Promise<string> {
-  const dir = path.join(process.cwd(), "data", "proofs");
+  const dir = path.join(os.tmpdir(), "applykar", "proofs");
   await mkdir(dir, { recursive: true });
   const file = path.join(dir, `${Date.now()}-${source}.png`);
   await page.screenshot({ path: file, fullPage: true });

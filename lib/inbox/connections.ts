@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { mailConnections } from "@/lib/db/schema";
 
@@ -11,7 +11,7 @@ export async function saveGmailConnection(input: {
   await getDb()
     .insert(mailConnections)
     .values({
-      id: "gmail",
+      id: input.email ? `gmail:${input.email.toLowerCase()}` : "gmail",
       provider: "gmail",
       email: input.email,
       refreshToken: input.refreshToken,
@@ -30,16 +30,36 @@ export async function saveGmailConnection(input: {
     });
 }
 
+/** All connected Gmail inboxes (any Gmail account, independent of the sign-in email). */
+export async function getGmailConnections() {
+  return getDb().select().from(mailConnections).where(eq(mailConnections.provider, "gmail"));
+}
+
 export async function getGmailConnection() {
-  const rows = await getDb().select().from(mailConnections).where(eq(mailConnections.id, "gmail")).limit(1);
+  const rows = await getGmailConnections();
   return rows[0] ?? null;
+}
+
+export async function listConnections() {
+  return getDb().select().from(mailConnections).orderBy(mailConnections.createdAt);
+}
+
+export async function disconnectMail(id: string) {
+  await getDb().delete(mailConnections).where(eq(mailConnections.id, id));
+}
+
+export async function markSynced(id: string, codes: number) {
+  await getDb()
+    .update(mailConnections)
+    .set({ lastSyncedAt: new Date(), codesRead: sql`${mailConnections.codesRead} + ${codes}`, updatedAt: new Date() })
+    .where(and(eq(mailConnections.id, id)));
 }
 
 export async function saveImapConnection(input: { host: string; port: number; user: string; password: string; tls: boolean }) {
   await getDb()
     .insert(mailConnections)
     .values({
-      id: "imap",
+      id: `imap:${input.user.toLowerCase()}`,
       provider: "imap",
       imapHost: input.host,
       imapPort: input.port,
@@ -61,6 +81,6 @@ export async function saveImapConnection(input: { host: string; port: number; us
 }
 
 export async function getImapConnection() {
-  const rows = await getDb().select().from(mailConnections).where(eq(mailConnections.id, "imap")).limit(1);
+  const rows = await getDb().select().from(mailConnections).where(eq(mailConnections.provider, "imap")).limit(1);
   return rows[0] ?? null;
 }

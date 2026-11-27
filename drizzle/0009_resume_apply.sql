@@ -49,3 +49,12 @@ CREATE TABLE IF NOT EXISTS job_details (
   description text NOT NULL,
   fetched_at timestamptz NOT NULL DEFAULT now()
 );
+-- "N new since last visit" on the Jobs page.
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS feed_seen_at timestamptz;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS feed_prev_seen_at timestamptz;
+CREATE INDEX IF NOT EXISTS applications_status_idx ON applications (status, updated_at);
+-- Multiple inboxes: ids become gmail:<email> / imap:<user>.
+UPDATE mail_connections m SET id = 'gmail:' || lower(m.email)
+  WHERE m.id = 'gmail' AND m.email IS NOT NULL AND NOT EXISTS (SELECT 1 FROM mail_connections x WHERE x.id = 'gmail:' || lower(m.email));
+UPDATE mail_connections m SET id = 'imap:' || lower(m.imap_user)
+  WHERE m.id = 'imap' AND m.imap_user IS NOT NULL AND NOT EXISTS (SELECT 1 FROM mail_connections x WHERE x.id = 'imap:' || lower(m.imap_user));

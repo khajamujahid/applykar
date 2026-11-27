@@ -1,5 +1,18 @@
-import type { JobFilters, JobSource, Seniority, Workplace } from "@/lib/domain";
-import { JOB_SOURCES, SENIORITIES, WORKPLACES } from "@/lib/domain";
+import type { JobFilters, JobSource, JobType, Seniority, Workplace } from "@/lib/domain";
+import { JOB_SOURCES, JOB_TYPES, SENIORITIES, WORKPLACES } from "@/lib/domain";
+
+export const POSTED_OPTIONS = [
+  { value: "1h", hours: 1, label: "Past 1 hour" },
+  { value: "3h", hours: 3, label: "Past 3 hours" },
+  { value: "5h", hours: 5, label: "Past 5 hours" },
+  { value: "24h", hours: 24, label: "Past 24 hours" },
+  { value: "3d", hours: 72, label: "Past 3 days" },
+  { value: "1w", hours: 168, label: "Past week" },
+] as const;
+
+export function postedParam(hours?: number): string | undefined {
+  return POSTED_OPTIONS.find((option) => option.hours === hours)?.value;
+}
 
 type Params = Record<string, string | string[] | undefined>;
 
@@ -18,14 +31,19 @@ export function parseFilters(params: Params): JobFilters {
   const workplace = many<Workplace>(one(params.workplace), WORKPLACES);
   const seniority = many<Seniority>(one(params.seniority), SENIORITIES);
   const sources = many<JobSource>(one(params.source), JOB_SOURCES);
-  const posted = Number(one(params.posted));
+  const postedRaw = one(params.posted);
+  const postedHours = POSTED_OPTIONS.find((option) => option.value === postedRaw)?.hours ?? (Number(postedRaw) > 0 ? Math.min(168, Number(postedRaw) * 24) : undefined);
+  const jobTypes = many<JobType>(one(params.type), JOB_TYPES);
+  const limit = Number(one(params.n));
   const yoe = Number(one(params.yoe));
   return {
     q: one(params.q) || undefined,
     workplace: workplace.length ? workplace : undefined,
     seniority: seniority.length ? seniority : undefined,
     sources: sources.length ? sources : undefined,
-    postedWithinDays: posted === 1 || posted === 7 || posted === 30 ? posted : undefined,
+    postedWithinHours: postedHours,
+    jobTypes: jobTypes.length ? jobTypes : undefined,
+    limit: Number.isFinite(limit) && limit > 0 ? Math.min(400, limit) : undefined,
     c2cOnly: one(params.c2c) === "1",
     hasSalary: one(params.salary) === "1",
     includeW2Only: one(params.w2) === "1",
@@ -55,7 +73,10 @@ export function filtersToQuery(filters: JobFilters, jobId?: string | null): stri
   if (filters.workplace?.length) params.set("workplace", filters.workplace.join(","));
   if (filters.seniority?.length) params.set("seniority", filters.seniority.join(","));
   if (filters.sources?.length) params.set("source", filters.sources.join(","));
-  if (filters.postedWithinDays) params.set("posted", String(filters.postedWithinDays));
+  const posted = postedParam(filters.postedWithinHours ?? (filters.postedWithinDays ? filters.postedWithinDays * 24 : undefined));
+  if (posted) params.set("posted", posted);
+  if (filters.jobTypes?.length) params.set("type", filters.jobTypes.join(","));
+  if (filters.limit) params.set("n", String(filters.limit));
   if (filters.c2cOnly) params.set("c2c", "1");
   if (filters.hasSalary) params.set("salary", "1");
   if (filters.includeW2Only) params.set("w2", "1");

@@ -135,29 +135,38 @@
 
 :root,
 .dark {
-  --background: oklch(0.155 0.014 275);
-  --foreground: oklch(0.96 0.01 275);
-  --card: oklch(0.195 0.016 275);
-  --card-foreground: oklch(0.96 0.01 275);
-  --popover: oklch(0.21 0.018 275);
-  --popover-foreground: oklch(0.96 0.01 275);
-  --primary: oklch(0.68 0.16 285);
-  --primary-foreground: oklch(0.985 0.005 285);
-  --secondary: oklch(0.25 0.02 275);
-  --secondary-foreground: oklch(0.96 0.01 275);
-  --muted: oklch(0.24 0.018 275);
-  --muted-foreground: oklch(0.74 0.02 275);
-  --accent: oklch(0.29 0.04 285);
-  --accent-foreground: oklch(0.97 0.01 275);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.68 0.16 285);
-  --sidebar: oklch(0.175 0.016 275);
-  --sidebar-foreground: oklch(0.96 0.01 275);
-  --sidebar-primary: oklch(0.68 0.16 285);
-  --sidebar-primary-foreground: oklch(0.985 0.005 285);
-  --sidebar-accent: oklch(0.28 0.04 285);
-  --sidebar-accent-foreground: oklch(0.97 0.01 275);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.68 0.16 285);
+  /* Applykar light theme (approved mockups): white surfaces, indigo/violet primary. */
+  --background: #ffffff;
+  --foreground: #16152b;
+  --card: #ffffff;
+  --card-foreground: #16152b;
+  --popover: #ffffff;
+  --popover-foreground: #16152b;
+  --primary: #4a3bd4;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f1fd;
+  --secondary-foreground: #2d2391;
+  --muted: #f6f6f9;
+  --muted-foreground: #6b6a80;
+  --accent: #f1effd;
+  --accent-foreground: #2d2391;
+  --destructive: #dc3545;
+  --border: #e6e5ee;
+  --input: #dddbe8;
+  --ring: #4a3bd4;
+  --radius: 0.6rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #16152b;
+  --sidebar-primary: #4a3bd4;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1effd;
+  --sidebar-accent-foreground: #2d2391;
+  --sidebar-border: #e6e5ee;
+  --sidebar-ring: #4a3bd4;
+  color-scheme: light;
+}
+
+.scroll-thin { scrollbar-width: thin; scrollbar-color: #d9d7e6 transparent; }
+@layer components {
+  .input { @apply h-9 w-full rounded-lg border border-input bg-white px-3 text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/15; }
 }

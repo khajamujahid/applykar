@@ -1,37 +1,28 @@
-import { FeedView } from "@/components/feed-view";
+import { JobsView } from "@/components/jobs/jobs-view";
+import { history } from "@/lib/ai/assistant";
 import { currentProfile } from "@/lib/current";
-import { latestBulkRun } from "@/lib/apply/bulk";
-import { listPresets } from "@/lib/feed/presets";
 import { parseFilters } from "@/lib/filters";
-import { getJob, searchJobs } from "@/lib/services/jobs";
+import { markFeedVisit, searchJobs } from "@/lib/services/jobs";
+import { OWNER_NAME } from "@/lib/profile/defaults";
 
 export const dynamic = "force-dynamic";
 
-export default async function FeedPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function JobsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const { profile } = await currentProfile();
   const filters = parseFilters(params);
-  const result = await searchJobs(profile.id, filters);
-  const requested = typeof params.job === "string" ? params.job : result.jobs[0]?.id;
-  const selected = requested ? await getJob(profile.id, requested) : null;
-  const presets = await listPresets(profile.id);
-  const latest = await latestBulkRun(profile.id);
-  const bulk = latest
-    ? {
-        status: latest.status,
-        items: latest.items.map((item) => ({
-          id: item.id,
-          title: item.title,
-          companyName: item.companyName,
-          status: item.status,
-          detail: item.detail,
-          missingQuestions: item.missingQuestions ?? [],
-        })),
-      }
-    : null;
-  return <FeedView jobs={result.jobs} total={result.total} selected={selected} filters={filters} presets={presets} bulk={bulk} />;
+  const since = await markFeedVisit(profile.id);
+  const [result, messages] = await Promise.all([searchJobs(profile.id, filters, { since, sinceFallbackHours: 24 }), history(profile.id)]);
+  const selected = typeof params.job === "string" ? params.job : null;
+  return (
+    <JobsView
+      jobs={result.jobs}
+      total={result.total}
+      newSinceVisit={result.newSinceVisit}
+      filters={filters}
+      selectedId={selected}
+      firstName={OWNER_NAME.split(" ")[0]}
+      initialMessages={messages}
+    />
+  );
 }
