@@ -32,7 +32,7 @@ export const ANSWER_CATALOG: CatalogEntry[] = [
   { key: "address_line2", group: "Contact", label: "Address line 2", question: "Address line 2 (apt, suite)", answer: "", match: /address line ?2|apartment|\bapt\b|\bsuite\b/i },
   { key: "location", group: "Contact", label: "Current location", question: "Current location (city, state)", answer: "Berlin, Connecticut, United States", match: /^location\b|current location|where are you (currently )?(located|based)|location \(city\)/i },
   { key: "city", group: "Contact", label: "City", question: "City", answer: "Berlin", match: /\bcity\b|\btown\b/i },
-  { key: "state_region", group: "Contact", label: "State", question: "State", answer: "Connecticut", match: /^state\b|state\/province|province|^region$|state of residence/i },
+  { key: "state_region", group: "Contact", label: "State", question: "State", answer: "Connecticut", match: /^state\b|state\/province|province|^region$|state of residence|what state|which (u\.?s\.?|us) state/i },
   { key: "postal_code", group: "Contact", label: "ZIP code", question: "ZIP / postal code", answer: "", match: /postal|\bzip\b/i },
   { key: "country", group: "Contact", label: "Country", question: "Country of residence", answer: "United States", match: /^country$|country of residence|^country \(|current country|^country\/region$/i },
   { key: "linkedin", group: "Contact", label: "LinkedIn", question: "LinkedIn profile URL", answer: "https://www.linkedin.com/in/mujahiddin-md-6b21b1390", match: /linked ?in/i },
@@ -59,7 +59,7 @@ export const ANSWER_CATALOG: CatalogEntry[] = [
   { key: "work_arrangement", group: "Job preferences", label: "Remote / hybrid / onsite", question: "Are you open to remote, hybrid or onsite work?", answer: "Yes, open to remote, hybrid or onsite (remote preferred)", match: /remote|hybrid|on-?site|in[- ]office|in the office|commut|work arrangement|workplace type/i },
   { key: "travel", group: "Job preferences", label: "Willing to travel", question: "Are you willing to travel?", answer: "Yes, some travel is fine", match: /travel/i },
   { key: "years_experience", group: "Job preferences", label: "Years of experience", question: "How many years of experience do you have? (blank = from your profile)", answer: "", match: /years of (professional |relevant |related |total |work )?experience|how many years/i },
-  { key: "referral_source", group: "Job preferences", label: "How did you hear", question: "How did you hear about this job?", answer: "Company website / Job board", match: /how did you (hear|find|learn)|hear about (us|this)|^source$|referral source|where did you (find|see|learn)/i },
+  { key: "referral_source", group: "Job preferences", label: "How did you hear", question: "How did you hear about this job?", answer: "Company website / Job board", match: /how did you (?:first )?(hear|find|learn)|hear about (us|this)|^source$|referral source|where did you (find|see|learn)/i },
 
   // Background
   { key: "government_employee", group: "Background", label: "Government employee history", question: "Have you ever been employed by a government agency?", answer: "No", match: /government (employee|employment|official|agency)|federal (employee|government|agency)|public sector|worked for (the |a )?(u\.?s\.? |federal |state )?government/i },

@@ -149,3 +149,8 @@ describe("dry-run findings (Nov 27)", () => {
 it("matches 'over the age of 18'", () => {
   expect(matchAnswerKey("Are you over the age of 18?")).toBe("age_18");
 });
+
+it("maps 'first learn about' and 'what state are you located in'", () => {
+  expect(matchAnswerKey("How did you first learn about Affirm as an employer?")).toBe("referral_source");
+  expect(matchAnswerKey("What state are you located in?")).toBe("state_region");
+});
