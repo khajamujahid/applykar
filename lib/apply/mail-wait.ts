@@ -1,4 +1,5 @@
 import { getLatestCode, getVerifyLink } from "@/lib/inbox/store";
+import { fileMailWaiter } from "@/lib/apply/file-mail";
 
 /** Ask the site to pull fresh mail (Gmail OAuth / IMAP live on Vercel), falling back to a local sync. */
 export async function refreshInbox(): Promise<void> {
@@ -34,8 +35,11 @@ export function mailWaiter(profileId: string, since: Date, attempts = Number(pro
     }
     return null;
   }
+  const files = fileMailWaiter();
   return {
-    getCode: async (employer: string) => (await poll(() => getLatestCode(profileId, employer, after)))?.code ?? null,
-    getLink: async (employer: string) => (await poll(() => getVerifyLink(profileId, employer, after)))?.url ?? null,
+    getCode: async (employer: string) =>
+      (files ? await files.getCode(employer) : null) ?? (await poll(() => getLatestCode(profileId, employer, after)))?.code ?? null,
+    getLink: async (employer: string) =>
+      (files ? await files.getLink(employer) : null) ?? (await poll(() => getVerifyLink(profileId, employer, after)))?.url ?? null,
   };
 }

@@ -139,7 +139,10 @@ describe("dry-run findings (Nov 27)", () => {
       "https://job-boards.greenhouse.io/embed/job_app?for=roblox&token=8283619",
     );
     expect(applyTarget({ source: "lever", externalId: "x", applyUrl: "https://jobs.lever.co/a/b/apply" })?.source).toBe("lever");
-    expect(applyTarget({ source: "recruitee", externalId: "x", applyUrl: "https://careers.example.com/o/x" })).toBeNull();
+    expect(applyTarget({ source: "recruitee", externalId: "x", applyUrl: "https://careers.example.com/o/x" })?.source).toBe("recruitee");
+    expect(applyTarget({ source: "smartrecruiters", externalId: "nearmap:744000164094589", applyUrl: "https://api.smartrecruiters.com/v1/companies/nearmap/postings/744000164094589" })?.url).toBe(
+      "https://jobs.smartrecruiters.com/nearmap/744000164094589",
+    );
   });
 });
 

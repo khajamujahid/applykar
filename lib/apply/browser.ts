@@ -94,7 +94,7 @@ async function fillControl(page: Page, id: string, value: string): Promise<void>
 }
 
 export async function applyOnPage(page: Page, request: ApplyRequest, options?: { skipNavigation?: boolean }): Promise<ApplyResult> {
-  assertApplyHost(request.url);
+  assertApplyHost(request.url, request.source);
   if (request.source === "workday" || request.source === "icims") {
     const flows = await import("@/lib/apply/ats-flows");
     return request.source === "workday" ? flows.applyWorkday(page, request) : flows.applyIcims(page, request);

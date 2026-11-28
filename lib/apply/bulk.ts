@@ -1,5 +1,6 @@
 import { desc, eq, sql } from "drizzle-orm";
 import type { ApplySource } from "@/lib/apply/hosts";
+import { BOARD_SOURCES } from "@/lib/domain";
 import { sourceFromUrl } from "@/lib/apply/hosts";
 import { getDb } from "@/lib/db/client";
 import { bulkItems, bulkRuns } from "@/lib/db/schema";
@@ -8,7 +9,7 @@ import { searchJobs } from "@/lib/services/jobs";
 export async function createBulkRun(profileId: string, count: number) {
   const size = Math.min(50, Math.max(5, count));
   const db = getDb();
-  const feed = await searchJobs(profileId, { sources: ["greenhouse", "lever", "ashby", "workday", "icims"] });
+  const feed = await searchJobs(profileId, { sources: [...BOARD_SOURCES] });
   const already = await db
     .select({ jobId: bulkItems.jobId })
     .from(bulkItems)

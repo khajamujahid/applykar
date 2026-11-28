@@ -179,12 +179,13 @@ export async function applyWorkday(page: Page, request: ApplyRequest): Promise<A
   const signInEmail = page.locator("[data-automation-id='email']").first();
   if ((await createAccount.count()) > 0 || (await signInEmail.isVisible().catch(() => false))) {
     const password = savedValue(request.answers, "ats_password");
-    if (!request.submit || !password) {
+    // Create or sign in even when submit is off; only the final application submit is held back.
+    if (!password) {
       const screenshotPath = await shot(page, "workday");
       return {
         status: "skipped",
-        missing: password ? [] : ["Workday account password (saved answer ats_password)"],
-        proofNote: "Workday requires an account for this employer. Stopped before creating it.",
+        missing: ["Workday account password (saved answer ats_password)"],
+        proofNote: "Workday requires an account for this employer. Set the career-site password in Settings.",
         screenshotPath,
       };
     }
@@ -229,14 +230,19 @@ export async function applyWorkday(page: Page, request: ApplyRequest): Promise<A
     const missing = await fillWorkdayStep(page, request);
     const next = page.locator("[data-automation-id='pageFooterNextButton'], [data-automation-id='bottom-navigation-next-button']").first();
     const label = ((await next.innerText().catch(() => "")) || "").trim();
-    if (missing.length || !request.submit) {
+    const isSubmit = /submit/i.test(label) && !/next/i.test(label);
+    if (missing.length) {
       const screenshotPath = await shot(page, "workday");
       return {
-        status: missing.length ? "skipped" : "ready",
+        status: "skipped",
         missing,
-        proofNote: missing.length ? `Filled known answers on step ${step + 1}. Did not continue. Unanswered: ${missing.join("; ")}` : `Step ${step + 1} filled. Submit is off.`,
+        proofNote: `Filled known answers on step ${step + 1}. Did not continue. Unanswered: ${missing.join("; ")}`,
         screenshotPath,
       };
+    }
+    if (isSubmit && !request.submit) {
+      const screenshotPath = await shot(page, "workday");
+      return { status: "ready", missing: [], proofNote: `All Workday steps filled through review. Stopped before submit.`, screenshotPath };
     }
     await next.click();
     await page.waitForTimeout(3500);
@@ -244,7 +250,7 @@ export async function applyWorkday(page: Page, request: ApplyRequest): Promise<A
     if (errors.length) {
       return { status: "skipped", missing: errors.map(clean), proofNote: "Workday rejected the step.", screenshotPath: await shot(page, "workday") };
     }
-    if (/^submit$/i.test(label)) {
+    if (isSubmit) {
       const body = await page.locator("body").innerText();
       const screenshotPath = await shot(page, "workday");
       if (/application submitted|thank you|successfully submitted/i.test(body)) return { status: "applied", missing: [], proofNote: body.slice(0, 500), screenshotPath };
@@ -276,15 +282,7 @@ export async function applyIcims(page: Page, request: ApplyRequest): Promise<App
     await email.fill(request.applicant?.email ?? "");
     const consent = frame.locator("input[type='checkbox'][name*='accept' i], input[type='checkbox'][id*='privacy' i]").first();
     const consentRequired = (await consent.count()) > 0;
-    if (!request.submit) {
-      const screenshotPath = await shot(page, "icims");
-      return {
-        status: "ready",
-        missing: [],
-        proofNote: `iCIMS login filled with ${request.applicant?.email}. Stopped before Next (dry run).${consentRequired ? " A privacy consent checkbox is present." : ""}`,
-        screenshotPath,
-      };
-    }
+    // Sign in / create the account even when submit is off; only the final application submit is held back.
     if (consentRequired && !savedValue(request.answers, "privacy_consent")) {
       return { status: "skipped", missing: ["Privacy policy consent (saved answer privacy_consent)"], proofNote: null, screenshotPath: await shot(page, "icims") };
     }
