@@ -37,6 +37,8 @@ async function main() {
     if (row.key === "email") return { ...row, answer: email };
     if (row.key === "phone") return { ...row, answer: "2025550100" };
     if (row.key === "full_name") return { ...row, answer: "Applykar Tester" };
+    if (row.key === "address" || row.key === "address_line1" || row.key === "street") return { ...row, answer: row.answer.trim() || "100 Test Street" };
+    if (row.key === "zip" || row.key === "postal_code" || row.key === "zip_code") return { ...row, answer: row.answer.trim() || "06037" };
     return row;
   });
   if (!answers.some((row) => row.key === "ats_password")) {

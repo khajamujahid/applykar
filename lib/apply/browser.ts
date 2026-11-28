@@ -104,13 +104,30 @@ export async function applyOnPage(page: Page, request: ApplyRequest, options?: {
     await page.locator("form label, form input").first().waitFor({ timeout: 12_000 }).catch(() => undefined);
     // React boards (Greenhouse, Ashby) re-render after hydration and wipe anything typed earlier.
     await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(800).catch(() => undefined);
+    // SmartRecruiters / Workable / BambooHR often show a posting first; open the apply form.
+    const preview = await readQuestions(page, request.source);
+    const hasIdentity = preview.some((question) => /email|first name|full name|^name\b/i.test(question.label));
+    if (!hasIdentity) {
+      const apply = page.locator("a, button, [role='button'], input[type='button'], input[type='submit']").filter({ hasText: /interested|apply now|apply for this job|apply for this position|apply to (this )?(position|job|role)|start application|^apply$/i }).first();
+      if (await apply.count()) {
+        // Stay in this tab so Cloudflare / session cookies from the posting page are kept.
+        await page.evaluate(() => document.querySelectorAll("a[target]").forEach((a) => a.setAttribute("target", "_self")));
+        await Promise.all([
+          page.waitForURL(/oneclick|application|\/apply|login/i, { timeout: 15_000 }).catch(() => undefined),
+          apply.click({ force: true }),
+        ]).catch(() => undefined);
+        await page.locator("form label, form input, input[type='email'], input[type='text']").first().waitFor({ timeout: 20_000 }).catch(() => undefined);
+        await page.waitForTimeout(2000).catch(() => undefined);
+      }
+    }
   }
   const questions = await readQuestions(page, request.source);
   if (questions.length === 0) {
     const text = (await page.locator("body").innerText().catch(() => "")).slice(0, 4000);
+    const blocked = /403 error|request could not be satisfied|attention required|cf-error|access denied|sorry, you have been blocked/i.test(text);
     const closed = /couldn'?t find anything here|no longer (available|accepting|open)|(posting|job|position) (has been |was )?(closed|filled|removed)|page not found|\b404\b/i.test(text);
-    return { status: "failed", missing: [], proofNote: null, screenshotPath: null, error: closed ? "This job posting is closed or was removed by the employer." : "No application form was found." };
+    return { status: "failed", missing: [], proofNote: null, screenshotPath: null, error: blocked ? "The career site blocked the application form (Cloudflare or bot check). Open the original job link to apply." : closed ? "This job posting is closed or was removed by the employer." : "No application form was found." };
   }
   const plan = planForm(questions, request.answers, request.applicant);
   for (const answer of plan.answers) {
@@ -136,7 +153,7 @@ export async function applyOnPage(page: Page, request: ApplyRequest, options?: {
     await fillControl(page, answer.id, answer.value);
   }
   // Second pass: anything a late re-render cleared gets typed again.
-  await page.waitForTimeout(1_000);
+  await page.waitForTimeout(1_000).catch(() => undefined);
   for (const answer of plan.answers) {
     if (answer.kind === "choice") continue;
     const control = controlLocator(page, answer.id);
@@ -168,8 +185,12 @@ export async function applyOnPage(page: Page, request: ApplyRequest, options?: {
   const formShot = page.locator("form").first();
   const shoot = async () => {
     // A form that keeps re-rendering can't be element-captured; fall back to the page, and never fail the run over a proof image.
-    const ok = (await formShot.count()) > 0 && (await formShot.screenshot({ path: screenshotPath, timeout: 10_000 }).then(() => true).catch(() => false));
-    if (!ok) await page.screenshot({ path: screenshotPath, fullPage: true, timeout: 15_000 }).catch(() => undefined);
+    try {
+      const ok = (await formShot.count()) > 0 && (await formShot.screenshot({ path: screenshotPath, timeout: 10_000 }).then(() => true).catch(() => false));
+      if (!ok) await page.screenshot({ path: screenshotPath, fullPage: true, timeout: 15_000 }).catch(() => undefined);
+    } catch {
+      /* the site may have closed the tab */
+    }
   };
   const challenge = page.locator(".h-captcha, .g-recaptcha:not([data-size='invisible']), .cf-turnstile");
   if (!plan.ready || !request.submit) {
